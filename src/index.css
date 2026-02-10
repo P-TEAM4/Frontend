@@ -1,0 +1,497 @@
+/* src/index.css */
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* === Google Font === */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+/* === LoL 테마 CSS 변수 === */
+:root {
+  /* 배경 계층 */
+  --bg-base: #1C1C1F;
+  --bg-primary: #121214;
+  --bg-secondary: #1C1C1F;
+  --bg-card: #282830;
+  --bg-card-hover: #31313C;
+  --bg-surface: #31313C;
+
+  /* 포인트 컬러 (LoL 로고: 틸 + 골드) */
+  --accent-teal: #0AC8B9;
+  --accent-teal-hover: #08A8A0;
+  --accent-gold: #C8AA6E;
+  --accent-gold-light: #F0E6D2;
+
+  /* 승/패 */
+  --win: #0AC8B9;
+  --win-bg: #1A3B38;
+  --win-border: #0AC8B9;
+  --lose: #E84057;
+  --lose-bg: #59343B;
+  --lose-border: #E84057;
+
+  /* 텍스트 */
+  --text-primary: #F0F0F0;
+  --text-secondary: #9E9EB1;
+  --text-muted: #515163;
+
+  /* 보더 */
+  --border-color: #2C2C35;
+  --border-subtle: #424254;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* === 스크롤바 === */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* === 카드 스타일 === */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  border-color: var(--border-subtle);
+}
+
+/* 승리/패배 카드 — op.gg 스타일 */
+.card-win {
+  background: var(--win-bg);
+  border-left: 6px solid var(--win-border);
+}
+
+.card-lose {
+  background: var(--lose-bg);
+  border-left: 6px solid var(--lose-border);
+}
+
+/* === 버튼 === */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  outline: none;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--accent-teal);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--accent-teal-hover);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-card-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.btn-ghost:hover {
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+
+/* === 입력 필드 === */
+.input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-size: 14px;
+  width: 100%;
+  transition: border-color 0.2s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent-teal);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+/* === 뱃지 === */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.badge-gold {
+  background: rgba(200, 170, 110, 0.15);
+  color: var(--accent-gold);
+  border: 1px solid rgba(200, 170, 110, 0.3);
+}
+
+.badge-blue {
+  background: rgba(10, 200, 185, 0.15);
+  color: var(--accent-teal);
+  border: 1px solid rgba(10, 200, 185, 0.3);
+}
+
+.badge-win {
+  background: rgba(83, 131, 232, 0.15);
+  color: var(--win);
+}
+
+.badge-lose {
+  background: rgba(232, 64, 87, 0.15);
+  color: var(--lose);
+}
+
+/* === 로딩 스피너 === */
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent-teal);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* === 테이블 === */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+}
+
+.table th {
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.table tr:hover td {
+  background: var(--bg-card-hover);
+}
+
+/* === 모달 오버레이 === */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+/* === KDA 색상 === */
+.kda-perfect {
+  color: #F19B00;
+}
+
+.kda-good {
+  color: var(--accent-teal);
+}
+
+.kda-average {
+  color: var(--text-primary);
+}
+
+.kda-bad {
+  color: var(--lose);
+}
+
+/* === 링크 === */
+a {
+  color: var(--accent-teal);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+a:hover {
+  color: #6B9AFF;
+}
+
+/* === 섹션 헤더 === */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* === 프로그레스 바 === */
+.progress-bar {
+  height: 6px;
+  background: var(--bg-primary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent-teal);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+/* === 애니메이션 === */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+.animate-fade-in-down {
+  animation: fadeInDown 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg,
+      transparent 25%,
+      rgba(255, 255, 255, 0.05) 50%,
+      transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* === 승률 원형 차트 === */
+.win-rate-circle {
+  transition: stroke-dasharray 0.6s ease;
+}
+
+/* === 티어 뱃지 색상 === */
+.tier-iron {
+  color: #848484;
+}
+
+.tier-bronze {
+  color: #A5855D;
+}
+
+.tier-silver {
+  color: #7B8B8F;
+}
+
+.tier-gold {
+  color: #C8AA6E;
+}
+
+.tier-platinum {
+  color: #4E9996;
+}
+
+.tier-emerald {
+  color: #149B93;
+}
+
+.tier-diamond {
+  color: #576BCE;
+}
+
+.tier-master {
+  color: #9D48E0;
+}
+
+.tier-grandmaster {
+  color: #E84057;
+}
+
+.tier-challenger {
+  color: #F4C874;
+}
+
+/* === 챔피언 아이콘 === */
+.champion-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+  object-fit: cover;
+}
+
+.champion-icon-lg {
+  width: 64px;
+  height: 64px;
+}
+
+.champion-icon-sm {
+  width: 32px;
+  height: 32px;
+}
+
+/* === 글로우 효과 (선택적) === */
+.glow-blue {
+  box-shadow: 0 0 12px rgba(83, 131, 232, 0.3);
+}
+
+.glow-gold {
+  box-shadow: 0 0 12px rgba(200, 170, 110, 0.3);
+}
