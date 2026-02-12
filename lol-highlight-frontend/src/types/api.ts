@@ -37,8 +37,20 @@ export interface UserResponse {
     name: string;
     profileImage: string | null;
     riotId: string | null;
+    puuid: string | null;
     summonerName: string | null;
     tagLine: string | null;
+    profileIconId: number | null;
+    summonerLevel: number | null;
+    tier: string | null;
+    rank: string | null;
+    leaguePoints: number | null;
+    wins: number | null;
+    losses: number | null;
+    winRate: number | null;
+    averageKda: number | null;
+    averageVisionScore: number | null;
+    averageCsPerMin: number | null;
     provider: 'GOOGLE';
     role: 'USER' | 'ADMIN';
     createdAt: string;
@@ -145,7 +157,7 @@ export type HighlightStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
 export interface HighlightResponse {
     id: number;
-    matchId: number;
+    matchId: string;
     title: string;
     description: string | null;
     videoUrl: string | null;
@@ -160,7 +172,7 @@ export interface HighlightResponse {
 }
 
 export interface CreateHighlightRequest {
-    matchId: number;
+    matchId: string;
     title: string;
     description?: string;
     startTime: number;

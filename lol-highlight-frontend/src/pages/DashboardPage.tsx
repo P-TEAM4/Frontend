@@ -1,16 +1,16 @@
 // src/pages/DashboardPage.tsx
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../store/authStore';
-import { getCurrentUser, linkRiot } from '../api/users';
 import { getMatches } from '../api/matches';
+import { getPlayerHighlights } from '../api/highlights';
 import MatchCard from '../components/matches/MatchCard';
 import Button from '../components/common/Button';
+import { formatRelativeTime } from '../types/api';
 
 const DashboardPage: React.FC = () => {
     const navigate = useNavigate();
-    const queryClient = useQueryClient();
     const user = useUser();
 
     // 최근 경기 조회 (연동된 경우만)
@@ -27,10 +27,20 @@ const DashboardPage: React.FC = () => {
         staleTime: 2 * 60 * 1000,
     });
 
-    // AI 분석 더미 데이터
+    const puuid = user?.puuid || '';
+
+    // 최근 하이라이트 조회 (연동된 경우만)
+    const { data: highlightsData, isLoading: isLoadingHighlights } = useQuery({
+        queryKey: ['recentHighlights', puuid],
+        queryFn: () => getPlayerHighlights(puuid, 0, 3),
+        enabled: !!puuid,
+        staleTime: 2 * 60 * 1000,
+    });
+
+    // AI 분석 더미 데이터 (추후 실제 API 연결)
     const aiAnalysis = {
-        winRate: 62,
-        kda: 3.45,
+        winRate: user?.winRate || 0,
+        kda: user?.averageKda || 0,
         mainPosition: 'Jungle',
         feedback: [
             "초반 갱킹 성공률이 75%로 매우 높습니다.",
@@ -39,12 +49,7 @@ const DashboardPage: React.FC = () => {
         ]
     };
 
-    // 하이라이트 더미 데이터
-    const highlights = [
-        { id: 1, title: "Lee Sin Insec Kick Quadra Kill", duration: "0:45", date: "2시간 전", thumbnail: "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/LeeSin_0.jpg" },
-        { id: 2, title: "Baron Steal with Smite", duration: "0:30", date: "1일 전", thumbnail: "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Viego_0.jpg" },
-        { id: 3, title: "Perfect Teamfight Ace", duration: "1:12", date: "3일 전", thumbnail: "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Ahri_0.jpg" }
-    ];
+    const highlights = highlightsData?.content || [];
 
     if (!user) {
         return (
@@ -121,25 +126,53 @@ const DashboardPage: React.FC = () => {
                     </h2>
                     <Button variant="ghost" size="sm" onClick={() => navigate('/highlights')}>더보기</Button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {highlights.map((video) => (
-                        <div key={video.id} className="group relative rounded-lg overflow-hidden border border-[#1E3A5F] bg-[#0D1B2A] cursor-pointer hover:border-[#C8AA6E] transition-all">
-                            <div className="aspect-video relative">
-                                <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                                    <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform">
-                                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+
+                {!puuid ? (
+                    <div className="text-center py-8 bg-[#0D1B2A] rounded-xl border border-[#1E3A5F]">
+                        <p className="text-[#8B8B8B]">
+                            Riot 계정을 연동하면 하이라이트를 볼 수 있습니다.
+                        </p>
+                        <Button variant="ghost" size="sm" className="mt-2" onClick={() => navigate('/highlights')}>
+                            계정 연동하기
+                        </Button>
+                    </div>
+                ) : isLoadingHighlights ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {[...Array(3)].map((_, i) => (
+                            <div key={i} className="aspect-video bg-[#0D1B2A] rounded-lg animate-pulse" />
+                        ))}
+                    </div>
+                ) : highlights.length === 0 ? (
+                    <div className="text-center py-8 bg-[#0D1B2A] rounded-xl border border-[#1E3A5F]">
+                        <p className="text-[#8B8B8B]">아직 하이라이트가 없습니다.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {highlights.map((highlight) => (
+                            <div key={highlight.id} className="group relative rounded-lg overflow-hidden border border-[#1E3A5F] bg-[#0D1B2A] cursor-pointer hover:border-[#C8AA6E] transition-all">
+                                <div className="aspect-video relative">
+                                    <img
+                                        src={highlight.thumbnailUrl || 'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/Teemo_0.jpg'}
+                                        alt={highlight.title}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                    <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                        <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                                        </div>
                                     </div>
+                                    <span className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-0.5 rounded">
+                                        {Math.floor(highlight.duration / 60)}:{(highlight.duration % 60).toString().padStart(2, '0')}
+                                    </span>
                                 </div>
-                                <span className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-0.5 rounded">{video.duration}</span>
+                                <div className="p-3">
+                                    <h3 className="font-bold text-white text-sm truncate">{highlight.title}</h3>
+                                    <p className="text-xs text-[#8B8B8B] mt-1">{formatRelativeTime(highlight.createdAt)}</p>
+                                </div>
                             </div>
-                            <div className="p-3">
-                                <h3 className="font-bold text-white text-sm truncate">{video.title}</h3>
-                                <p className="text-xs text-[#8B8B8B] mt-1">{video.date}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* 하단: 최근 경기 */}

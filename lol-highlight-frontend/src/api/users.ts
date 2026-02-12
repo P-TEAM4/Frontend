@@ -37,10 +37,19 @@ export const updateUser = async (data: UpdateUserRequest): Promise<UserResponse>
 };
 
 // Riot 계정 연동
-export const linkRiot = async (id: number, data: LinkRiotRequest): Promise<UserResponse> => {
-    const response = await apiClient.post<ApiResponse<UserResponse>>(`/users/${id}/link-riot`, data);
+export const linkRiot = async (data: LinkRiotRequest): Promise<UserResponse> => {
+    const response = await apiClient.post<ApiResponse<UserResponse>>('/users/link-riot', data);
     if (!response.data.data) {
         throw new Error('Riot 계정 연동에 실패했습니다.');
+    }
+    return response.data.data;
+};
+
+// Riot 계정 연동 해제
+export const unlinkRiot = async (): Promise<UserResponse> => {
+    const response = await apiClient.delete<ApiResponse<UserResponse>>('/users/link-riot');
+    if (!response.data.data) {
+        throw new Error('Riot 계정 연동 해제에 실패했습니다.');
     }
     return response.data.data;
 };
