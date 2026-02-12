@@ -1,0 +1,374 @@
+/* src/index.css */
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* LoL 테마 CSS 변수 */
+:root {
+  /* 배경 */
+  --bg-primary: #050816;
+  --bg-secondary: #0A1428;
+  --bg-card: #0D1B2A;
+  --bg-card-hover: #112240;
+
+  /* 포인트 컬러 */
+  --accent-blue: #00C8FF;
+  --accent-cyan: #1BA9FF;
+  --accent-gold: #C8AA6E;
+  --accent-gold-light: #F0E6D2;
+
+  /* 승/패 */
+  --win: #28A0F0;
+  --win-bg: rgba(40, 160, 240, 0.15);
+  --lose: #E84057;
+  --lose-bg: rgba(232, 64, 87, 0.15);
+
+  /* 텍스트 */
+  --text-primary: #F0F0F0;
+  --text-secondary: #8B8B8B;
+  --text-muted: #5B5B5B;
+
+  /* 보더 */
+  --border-color: #1E3A5F;
+  --border-glow: rgba(0, 200, 255, 0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* 스크롤바 스타일 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-blue);
+}
+
+/* 글로우 효과 유틸리티 */
+.glow-blue {
+  box-shadow: 0 0 20px rgba(0, 200, 255, 0.3);
+}
+
+.glow-gold {
+  box-shadow: 0 0 20px rgba(200, 170, 110, 0.3);
+}
+
+.glow-blue-hover:hover {
+  box-shadow: 0 0 25px rgba(0, 200, 255, 0.4);
+}
+
+.glow-gold-hover:hover {
+  box-shadow: 0 0 25px rgba(200, 170, 110, 0.4);
+}
+
+/* 카드 스타일 */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 20px rgba(0, 200, 255, 0.2);
+}
+
+/* 승리/패배 카드 */
+.card-win {
+  background: linear-gradient(135deg, var(--win-bg) 0%, var(--bg-card) 100%);
+  border-left: 4px solid var(--win);
+}
+
+.card-lose {
+  background: linear-gradient(135deg, var(--lose-bg) 0%, var(--bg-card) 100%);
+  border-left: 4px solid var(--lose);
+}
+
+/* 버튼 기본 스타일 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  outline: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-gold) 0%, #A08050 100%);
+  color: #0A0A0A;
+}
+
+.btn-primary:hover {
+  box-shadow: 0 0 20px rgba(200, 170, 110, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+  color: #0A0A0A;
+}
+
+.btn-secondary:hover {
+  box-shadow: 0 0 20px rgba(0, 200, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.btn-ghost:hover {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 15px rgba(0, 200, 255, 0.3);
+}
+
+/* 입력 필드 */
+.input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 12px 16px;
+  color: var(--text-primary);
+  font-size: 14px;
+  width: 100%;
+  transition: all 0.3s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 15px rgba(0, 200, 255, 0.2);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+/* 뱃지 */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge-gold {
+  background: rgba(200, 170, 110, 0.2);
+  color: var(--accent-gold);
+  border: 1px solid var(--accent-gold);
+}
+
+.badge-blue {
+  background: rgba(0, 200, 255, 0.2);
+  color: var(--accent-blue);
+  border: 1px solid var(--accent-blue);
+}
+
+.badge-win {
+  background: var(--win-bg);
+  color: var(--win);
+}
+
+.badge-lose {
+  background: var(--lose-bg);
+  color: var(--lose);
+}
+
+/* 로딩 스피너 */
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 펄스 애니메이션 */
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(0, 200, 255, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 25px rgba(0, 200, 255, 0.6);
+  }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* 테이블 */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.table th {
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.table tr:hover td {
+  background: var(--bg-card-hover);
+}
+
+/* 모달 오버레이 */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+/* 챔피언 아이콘 */
+.champion-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+  object-fit: cover;
+}
+
+.champion-icon-lg {
+  width: 64px;
+  height: 64px;
+}
+
+.champion-icon-sm {
+  width: 32px;
+  height: 32px;
+}
+
+/* KDA 색상 */
+.kda-perfect {
+  color: var(--accent-gold);
+}
+
+.kda-good {
+  color: var(--accent-blue);
+}
+
+.kda-average {
+  color: var(--text-primary);
+}
+
+.kda-bad {
+  color: var(--lose);
+}
+
+/* 링크 스타일 */
+a {
+  color: var(--accent-blue);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+a:hover {
+  color: var(--accent-cyan);
+}
+
+/* 섹션 헤더 */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* 프로그레스 바 */
+.progress-bar {
+  height: 8px;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
