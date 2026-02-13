@@ -41,16 +41,19 @@ const MainLayout: React.FC = () => {
   );
 };
 
-// 공개 레이아웃 (Header만 있음)
+// 공개 레이아웃 (Header + Sidebar)
 const PublicLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#050816] via-[#0A1428] to-[#050816]">
       <Header />
-      <main className="pt-16">
-        <div className="max-w-7xl mx-auto p-6">
-          <Outlet />
-        </div>
-      </main>
+      <div className="flex pt-16">
+        <Sidebar />
+        <main className="flex-1 ml-64 p-6">
+          <div className="max-w-7xl mx-auto">
+            <Outlet />
+          </div>
+        </main>
+      </div>
     </div>
   );
 };
@@ -90,11 +93,19 @@ const App: React.FC = () => {
         const { getUserSettings } = await import('./api/users');
         const settings = await getUserSettings();
         
-        // Electron에 설정 적용
+        // Electron에 설정 적용 (약간의 지연 후 시도)
         if (typeof window !== 'undefined' && (window as any).require) {
-          const { ipcRenderer } = (window as any).require('electron');
-          await ipcRenderer.invoke('update-settings', settings);
-          console.log('Settings synced to Electron:', settings);
+          // Electron IPC가 준비될 때까지 약간 대기
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          try {
+            const { ipcRenderer } = (window as any).require('electron');
+            await ipcRenderer.invoke('update-settings', settings);
+            console.log('Settings synced to Electron:', settings);
+          } catch (ipcError) {
+            // IPC 에러는 무시 (Electron 환경이 아니거나 아직 준비되지 않음)
+            console.warn('Electron IPC not ready:', ipcError);
+          }
         }
       } catch (error) {
         console.error('Failed to sync settings to Electron:', error);

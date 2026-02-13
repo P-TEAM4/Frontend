@@ -68,6 +68,14 @@ export interface LeagueInfo {
     winRate: string;
 }
 
+export interface RecentStats {
+    totalGames: number;      // 최근 경기 수
+    wins: number;            // 승
+    losses: number;          // 패
+    winRate: string;         // 승률 (%)
+    averageKda: number;      // 평균 KDA
+}
+
 export interface SummonerProfileResponse {
     gameName: string;
     tagLine: string;
@@ -75,6 +83,7 @@ export interface SummonerProfileResponse {
     profileIconUrl: string;
     soloLeague: LeagueInfo | null;
     flexLeague: LeagueInfo | null;
+    recentStats: RecentStats | null;  // 최근 20경기 통계
 }
 
 // 소환사 프로필 정보 조회 (티어, 레벨 등)

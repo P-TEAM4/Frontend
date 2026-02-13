@@ -102,30 +102,45 @@ function createTray() {
     });
 }
 
-// 롤 클라이언트 프로세스 감지
+// 롤 런처 프로세스 감지
 function checkLeagueClient() {
     // 설정에서 자동 표시가 비활성화된 경우 체크하지 않음
     if (!appSettings.autoShowOnLol) {
+        console.log('[LOL Monitor] Auto-show disabled, skipping check');
         return;
     }
 
+    // 롤 런처 감지 (League of Legends.app)
     const processName = process.platform === 'win32' 
         ? 'LeagueClient.exe' 
-        : 'LeagueClient';
+        : 'League of Legends';
 
     const command = process.platform === 'win32'
         ? `tasklist /FI "IMAGENAME eq ${processName}" /NH`
-        : `pgrep -x ${processName}`;
+        : `pgrep -f "League of Legends"`;  // 런처 프로세스 감지
 
-    exec(command, (error, stdout) => {
+    console.log(`[LOL Monitor] Checking for process: ${processName}`);
+    console.log(`[LOL Monitor] Command: ${command}`);
+
+    exec(command, (error, stdout, stderr) => {
+        console.log(`[LOL Monitor] Error: ${error}`);
+        console.log(`[LOL Monitor] Stdout: ${stdout}`);
+        console.log(`[LOL Monitor] Stderr: ${stderr}`);
+
         if (!error && stdout && stdout.trim().length > 0) {
-            // 롤 클라이언트 실행 중 - 메인 윈도우 표시
+            // 롤 런처 실행 중 - 메인 윈도우 표시
+            console.log('[LOL Monitor] League of Legends detected!');
             if (mainWindow && !mainWindow.isVisible()) {
-                console.log('League of Legends detected! Showing window...');
+                console.log('[LOL Monitor] Showing window...');
                 mainWindow.show();
             } else if (!mainWindow) {
+                console.log('[LOL Monitor] Creating window...');
                 createWindow();
+            } else {
+                console.log('[LOL Monitor] Window already visible');
             }
+        } else {
+            console.log('[LOL Monitor] League of Legends not detected');
         }
     });
 }

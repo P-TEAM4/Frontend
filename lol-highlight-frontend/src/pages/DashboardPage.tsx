@@ -208,7 +208,13 @@ const DashboardPage: React.FC = () => {
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => navigate('/matches')}
+                        onClick={() => {
+                            if (user.summonerName && user.tagLine) {
+                                navigate(`/matches?gameName=${encodeURIComponent(user.summonerName)}&tagLine=${encodeURIComponent(user.tagLine)}`);
+                            } else {
+                                navigate('/matches');
+                            }
+                        }}
                         className="ml-auto"
                     >
                         전체보기

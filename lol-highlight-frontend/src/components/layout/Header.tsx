@@ -3,7 +3,6 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore, useUser } from '../../store/authStore';
 import { logout } from '../../api/auth';
-import Button from '../common/Button';
 
 const Header: React.FC = () => {
     const navigate = useNavigate();
@@ -22,88 +21,50 @@ const Header: React.FC = () => {
     };
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 bg-[#0A1428]/95 backdrop-blur-sm border-b border-[#1E3A5F]">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center justify-between h-16">
+        <header className="fixed top-0 left-0 right-0 z-50 bg-[#1C1C1F] border-b border-[#2C2C35]">
+            <div className="max-w-[1440px] mx-auto px-4">
+                <div className="flex items-center justify-between h-12">
                     {/* 로고 */}
-                    <Link to="/" className="flex items-center gap-3 group">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#C8AA6E] to-[#A08050] flex items-center justify-center shadow-[0_0_15px_rgba(200,170,110,0.3)] group-hover:shadow-[0_0_25px_rgba(200,170,110,0.5)] transition-all duration-300">
-                            <svg className="w-6 h-6 text-[#0A0A0A]" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                            </svg>
-                        </div>
-                        <span className="text-xl font-bold bg-gradient-to-r from-[#C8AA6E] to-[#F0E6D2] bg-clip-text text-transparent">
-                            NEXUS.GG
+                    <Link to="/" className="flex items-center gap-2 group">
+                        <span className="text-base font-black text-white group-hover:text-[#0AC8B9] transition-colors">
+                            NEXUS<span className="text-[#0AC8B9]">.GG</span>
                         </span>
                     </Link>
 
-                    {/* 네비게이션 */}
-                    <nav className="hidden md:flex items-center gap-6">
-                        <Link
-                            to="/matches"
-                            className="text-[#A0A0A0] hover:text-[#00C8FF] transition-colors duration-200 font-medium"
-                        >
-                            전적 검색
-                        </Link>
-                        {isAuthenticated && (
-                            <>
-                                <Link
-                                    to="/dashboard"
-                                    className="text-[#A0A0A0] hover:text-[#00C8FF] transition-colors duration-200 font-medium"
-                                >
-                                    대시보드
-                                </Link>
-                                <Link
-                                    to="/highlights"
-                                    className="text-[#A0A0A0] hover:text-[#00C8FF] transition-colors duration-200 font-medium"
-                                >
-                                    내 하이라이트
-                                </Link>
-                            </>
-                        )}
-                    </nav>
-
                     {/* 사용자 메뉴 */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
                         {isAuthenticated && user ? (
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-3">
+                                <Link to="/settings" className="flex items-center gap-2 hover:bg-[#31313C] rounded-lg px-2 py-1.5 transition-colors">
                                     {user.profileImage ? (
                                         <img
                                             src={user.profileImage}
                                             alt={user.name}
-                                            className="w-8 h-8 rounded-full border-2 border-[#1E3A5F]"
+                                            className="w-6 h-6 rounded-full"
                                         />
                                     ) : (
-                                        <div className="w-8 h-8 rounded-full bg-[#1E3A5F] flex items-center justify-center">
-                                            <span className="text-sm font-medium text-[#A0A0A0]">
+                                        <div className="w-6 h-6 rounded-full bg-[#0AC8B9] flex items-center justify-center">
+                                            <span className="text-[10px] font-bold text-white">
                                                 {user.name?.charAt(0) || 'U'}
                                             </span>
                                         </div>
                                     )}
-                                    <div className="hidden sm:block">
-                                        <p className="text-sm font-medium text-[#F0F0F0]">{user.name}</p>
-                                        {user.summonerName && (
-                                            <p className="text-xs text-[#8B8B8B]">
-                                                {user.summonerName}#{user.tagLine}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                                <Link
-                                    to="/dashboard"
-                                    className="text-sm text-[#00C8FF] hover:text-[#00E5FF] transition-colors font-medium"
-                                >
-                                    마이페이지
+                                    <span className="text-xs text-[#9E9EB1] hidden sm:inline">{user.name}</span>
                                 </Link>
-                                <Button variant="ghost" size="sm" onClick={handleLogout}>
+                                <button
+                                    onClick={handleLogout}
+                                    className="text-xs text-[#515163] hover:text-[#9E9EB1] transition-colors px-2 py-1"
+                                >
                                     로그아웃
-                                </Button>
+                                </button>
                             </div>
                         ) : (
-                            <Button variant="primary" size="sm" onClick={() => navigate('/login')}>
+                            <button
+                                onClick={() => navigate('/login')}
+                                className="text-xs font-semibold bg-[#0AC8B9] hover:bg-[#08A8A0] text-white px-4 py-1.5 rounded transition-colors"
+                            >
                                 로그인
-                            </Button>
+                            </button>
                         )}
                     </div>
                 </div>

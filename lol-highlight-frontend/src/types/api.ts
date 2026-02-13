@@ -236,6 +236,47 @@ export const getProfileIconUrl = (iconId: number): string => {
     return `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/profileicon/${iconId}.png`;
 };
 
+// 랭크 엠블럼 URL 헬퍼
+export const getRankEmblemUrl = (tier: string): string => {
+    return `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${tier.toLowerCase()}.png`;
+};
+
+// 티어 기반 상위 퍼센트 계산 (Riot 공식 통계 기반)
+export const getTierPercentile = (tier: string, rank: string, lp: number): string => {
+    // 2024 시즌 기준 티어별 분포 (상위 %)
+    const tierDistribution: { [key: string]: number } = {
+        'IRON': 95,      // 하위 5%
+        'BRONZE': 80,    // 하위 20%
+        'SILVER': 60,    // 하위 40%
+        'GOLD': 40,      // 상위 40%
+        'PLATINUM': 20,  // 상위 20%
+        'EMERALD': 10,   // 상위 10%
+        'DIAMOND': 3,    // 상위 3%
+        'MASTER': 0.5,   // 상위 0.5%
+        'GRANDMASTER': 0.1,  // 상위 0.1%
+        'CHALLENGER': 0.01   // 상위 0.01%
+    };
+
+    const basePercentile = tierDistribution[tier.toUpperCase()] || 50;
+    
+    // 랭크 내에서 세분화 (I, II, III, IV)
+    const rankOrder: { [key: string]: number } = { 'I': 0, 'II': 0.25, 'III': 0.5, 'IV': 0.75 };
+    const rankOffset = rankOrder[rank] || 0;
+    
+    // 다음 티어와의 차이를 4등분한 값
+    const tierGap = tier === 'IRON' ? 5 : 
+                    tier === 'BRONZE' ? 20 : 
+                    tier === 'SILVER' ? 20 : 
+                    tier === 'GOLD' ? 20 : 
+                    tier === 'PLATINUM' ? 10 : 
+                    tier === 'EMERALD' ? 7 : 
+                    tier === 'DIAMOND' ? 2.5 : 0.4;
+    
+    const percentile = basePercentile - (tierGap * rankOffset);
+    
+    return percentile.toFixed(2);
+};
+
 // KDA 등급 계산
 export const getKdaRating = (kda: number): 'perfect' | 'good' | 'average' | 'bad' => {
     if (kda >= 5) return 'perfect';

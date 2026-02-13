@@ -1,9 +1,9 @@
 // src/pages/SettingsPage.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore, useUser } from '../store/authStore';
-import { updateUser, deleteUser, linkRiot, unlinkRiot } from '../api/users';
+import { updateUser, deleteUser, linkRiot, unlinkRiot, getUserSettings, updateUserSettings } from '../api/users';
 import { logout } from '../api/auth';
 import Button from '../components/common/Button';
 
@@ -26,6 +26,12 @@ const SettingsPage: React.FC = () => {
     // 삭제 확인 상태
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+    // 앱 시작 설정 상태
+    const [autoLaunch, setAutoLaunch] = useState(false);
+    const [autoShowOnLol, setAutoShowOnLol] = useState(true);
+    const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
 
     // 사용자 정보 수정 Mutation (PUT /api/users)
     const updateUserMutation = useMutation({
@@ -91,6 +97,85 @@ const SettingsPage: React.FC = () => {
     const handleDeleteAccount = () => {
         if (deleteConfirmText !== '회원탈퇴') return;
         deleteUserMutation.mutate();
+    };
+
+    // 설정 로드
+    useEffect(() => {
+        const loadSettings = async () => {
+            try {
+                const settings = await getUserSettings();
+                setAutoLaunch(settings.autoLaunch);
+                setAutoShowOnLol(settings.autoShowOnLol);
+                
+                // Electron에도 설정 적용
+                try {
+                    const { ipcRenderer } = (window as any).require('electron');
+                    await ipcRenderer.invoke('update-settings', settings);
+                } catch (e) {
+                    console.warn('Electron IPC not available:', e);
+                }
+            } catch (error) {
+                console.error('Failed to load settings:', error);
+            } finally {
+                setIsLoadingSettings(false);
+            }
+        };
+
+        loadSettings();
+    }, []);
+
+    const handleAutoLaunchChange = async (checked: boolean) => {
+        if (isSavingSettings) return;
+        
+        setAutoLaunch(checked);
+        setIsSavingSettings(true);
+        
+        try {
+            const newSettings = { autoLaunch: checked, autoShowOnLol };
+            
+            // 백엔드 저장
+            await updateUserSettings(newSettings);
+            
+            // Electron 적용
+            try {
+                const { ipcRenderer } = (window as any).require('electron');
+                await ipcRenderer.invoke('update-settings', newSettings);
+            } catch (e) {
+                console.warn('Electron IPC not available:', e);
+            }
+        } catch (error) {
+            console.error('Failed to update settings:', error);
+            setAutoLaunch(!checked); // 실패 시 원래 값으로 되돌림
+        } finally {
+            setIsSavingSettings(false);
+        }
+    };
+
+    const handleAutoShowOnLolChange = async (checked: boolean) => {
+        if (isSavingSettings) return;
+        
+        setAutoShowOnLol(checked);
+        setIsSavingSettings(true);
+        
+        try {
+            const newSettings = { autoLaunch, autoShowOnLol: checked };
+            
+            // 백엔드 저장
+            await updateUserSettings(newSettings);
+            
+            // Electron 적용
+            try {
+                const { ipcRenderer } = (window as any).require('electron');
+                await ipcRenderer.invoke('update-settings', newSettings);
+            } catch (e) {
+                console.warn('Electron IPC not available:', e);
+            }
+        } catch (error) {
+            console.error('Failed to update settings:', error);
+            setAutoShowOnLol(!checked); // 실패 시 원래 값으로 되돌림
+        } finally {
+            setIsSavingSettings(false);
+        }
     };
 
     if (!user) {
@@ -381,7 +466,92 @@ const SettingsPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* 4. 위험 영역 - 회원 탈퇴 */}
+            {/* 4. 앱 시작 설정 */}
+            <div className="rounded-xl bg-[#0D1B2A] border border-[#1E3A5F] overflow-hidden">
+                <div className="p-6 border-b border-[#1E3A5F]">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                        <svg className="w-5 h-5 text-[#00C8FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        앱 시작 설정
+                    </h2>
+                </div>
+                <div className="p-6 space-y-4">
+                    {isLoadingSettings ? (
+                        <div className="text-center text-[#8B8B8B] py-4">설정을 불러오는 중...</div>
+                    ) : (
+                        <>
+                            {/* 컴퓨터 시작 시 자동 실행 */}
+                            <div className="flex items-center justify-between py-3">
+                                <div>
+                                    <div className="text-white font-medium">컴퓨터 시작 시 자동 실행</div>
+                                    <div className="text-sm text-[#8B8B8B] mt-1">
+                                        시스템 부팅 시 앱이 자동으로 백그라운드에서 실행됩니다
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => handleAutoLaunchChange(!autoLaunch)}
+                                    disabled={isSavingSettings}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                        autoLaunch ? 'bg-[#00C8FF]' : 'bg-[#2C2C35]'
+                                    } ${isSavingSettings ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                            autoLaunch ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+
+                            {/* 롤 실행 시 자동 표시 */}
+                            <div className="flex items-center justify-between py-3">
+                                <div>
+                                    <div className="text-white font-medium">롤 런처 실행 시 자동 표시</div>
+                                    <div className="text-sm text-[#8B8B8B] mt-1">
+                                        League of Legends 런처 실행 시 앱 창이 자동으로 표시됩니다
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => handleAutoShowOnLolChange(!autoShowOnLol)}
+                                    disabled={isSavingSettings}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                        autoShowOnLol ? 'bg-[#00C8FF]' : 'bg-[#2C2C35]'
+                                    } ${isSavingSettings ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <span
+                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                            autoShowOnLol ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                    />
+                                </button>
+                            </div>
+
+                            {/* 안내 메시지 */}
+                            <div className="mt-4 p-4 rounded-lg bg-[#050816] border border-[#1E3A5F]">
+                                <div className="flex items-start gap-3">
+                                    <div className="text-[#00C8FF] mt-1">
+                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                        </svg>
+                                    </div>
+                                    <div className="text-sm text-[#9E9EB1]">
+                                        <p className="font-semibold text-white mb-2">💡 사용 방법</p>
+                                        <ul className="space-y-1 list-disc list-inside">
+                                            <li><strong className="text-[#00C8FF]">"컴퓨터 시작 시 자동 실행"</strong>을 켜두면 앱이 백그라운드에서 항상 실행됩니다</li>
+                                            <li><strong className="text-[#00C8FF]">"롤 런처 실행 시 자동 표시"</strong>를 켜면 롤 런처 감지 시 창이 자동으로 나타납니다</li>
+                                            <li>앱이 완전히 꺼진 상태에서는 롤을 감지할 수 없습니다</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* 5. 위험 영역 - 회원 탈퇴 */}
             <div className="rounded-xl bg-[#0D1B2A] border border-[#E84057]/30 overflow-hidden">
                 <div className="p-6 border-b border-[#E84057]/30">
                     <h2 className="text-lg font-bold text-[#E84057] flex items-center gap-2">

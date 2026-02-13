@@ -1,6 +1,6 @@
 import React from 'react';
 import Button from '../common/Button';
-import { UserResponse, getProfileIconUrl } from '../../types/api';
+import { UserResponse, getProfileIconUrl, getTierPercentile } from '../../types/api';
 import { SummonerProfileResponse } from '../../api/matches';
 
 interface SummonerProfileHeaderProps {
@@ -26,19 +26,14 @@ const SummonerProfileHeader: React.FC<SummonerProfileHeaderProps> = ({
     // 프로필 아이콘 URL 사용 (없으면 기본값)
     const profileIconUrl = summonerProfile?.profileIconUrl ?? getProfileIconUrl(29);
 
-    // 랭킹 더미 데이터 (요청 사항)
-    let displayLadderRank = "N/A";
-    let displayTopPercent = "N/A";
-
-    if (summonerProfile) {
-        // Generate a random number for ladder rank (e.g., between 100,000 and 1,000,000)
-        const randomRank = Math.floor(Math.random() * (900000 - 100000 + 1)) + 100000;
-        displayLadderRank = randomRank.toLocaleString() + "위";
-
-        // Generate a random number for top percentage (e.g., between 10.00% and 30.00%)
-        const randomPercent = (Math.random() * (30 - 10) + 10).toFixed(2);
-        displayTopPercent = randomPercent + "%";
-    }
+    // 티어 기반 상위 퍼센트 계산
+    const displayTopPercent = summonerProfile?.soloLeague 
+        ? getTierPercentile(
+            summonerProfile.soloLeague.tier,
+            summonerProfile.soloLeague.rank,
+            summonerProfile.soloLeague.leaguePoints
+          ) + '%'
+        : 'N/A';
 
     return (
         <div className="bg-[#31313C] rounded-none md:rounded-lg p-6 mb-4 mt-8 w-full max-w-[1000px] mx-auto border-b border-[#1C1C1F]">
@@ -68,12 +63,14 @@ const SummonerProfileHeader: React.FC<SummonerProfileHeaderProps> = ({
                         </span>
                     </div>
 
-                    {/* 랭킹/티어 정보 (임시) */}
-                    <div className="flex items-center gap-2 text-sm text-[#9E9EB1] mb-4">
-                        <span className="hover:text-[#F0F0F0] cursor-pointer">
-                            래더 랭킹 <span className="text-[#5383E8] font-bold">{displayLadderRank}</span> (상위 {displayTopPercent})
-                        </span>
-                    </div>
+                    {/* 티어 기반 상위 퍼센트 */}
+                    {summonerProfile?.soloLeague && summonerProfile.soloLeague.tier !== 'UNRANKED' && (
+                        <div className="flex items-center gap-2 text-sm text-[#9E9EB1] mb-4">
+                            <span>
+                                랭크 상위 <span className="text-[#5383E8] font-bold">{displayTopPercent}</span>
+                            </span>
+                        </div>
+                    )}
 
                     <div className="flex gap-2">
                         <Button
