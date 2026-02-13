@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import type { MatchResponse } from '../../types/api';
 import {
     getChampionIconUrl,
+    getItemIconUrl,
     formatRelativeTime,
     formatGameDuration
 } from '../../types/api';
@@ -72,7 +73,7 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, hasHighlights = false }) =
                     <div key={i} className={`w-6 h-6 rounded-sm ${match.win ? 'bg-[#2F436E]' : 'bg-[#703C47]'} overflow-hidden`}>
                         {item !== 0 && (
                             <img
-                                src={`https://ddragon.leagueoflegends.com/cdn/14.23.1/img/item/${item}.png`}
+                                src={getItemIconUrl(item)}
                                 alt={`Item ${item}`}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
@@ -86,7 +87,7 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, hasHighlights = false }) =
                 <div className={`w-6 h-6 rounded-full ml-1 ${match.win ? 'bg-[#2F436E]' : 'bg-[#703C47]'} overflow-hidden`}>
                     {match.item6 !== 0 && (
                         <img
-                            src={`https://ddragon.leagueoflegends.com/cdn/14.23.1/img/item/${match.item6}.png`}
+                            src={getItemIconUrl(match.item6)}
                             alt={`Trinket ${match.item6}`}
                             className="w-full h-full object-cover"
                             onError={(e) => {

@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import { getMatches, refreshMatches, getSummonerInfo } from '../api/matches';
+import { getMatches, refreshMatches } from '../api/matches';
 import { useAuthStore } from '../store/authStore';
 import MatchCard from '../components/matches/MatchCard';
 import SummonerProfileHeader from '../components/matches/SummonerProfileHeader';
@@ -27,15 +27,7 @@ const MatchesPage: React.FC = () => {
 
     const [searchInput, setSearchInput] = useState('');
 
-    // 소환사 정보 조회 (티어, 레벨 등)
-    const { data: summonerProfile } = useQuery({
-        queryKey: ['summoner', activeSearch?.gameName, activeSearch?.tagLine],
-        queryFn: () => getSummonerInfo(activeSearch!.gameName, activeSearch!.tagLine),
-        enabled: !!activeSearch,
-        retry: false
-    });
-
-    // 전적 조회 (무한 스크롤)
+    // 전적 조회 (무한 스크롤) - 프로필 정보도 함께 반환
     const {
         data,
         fetchNextPage,
@@ -55,9 +47,12 @@ const MatchesPage: React.FC = () => {
             }),
         initialPageParam: 0,
         getNextPageParam: (lastPage) =>
-            lastPage.last ? undefined : lastPage.number + 1,
+            lastPage.matches.last ? undefined : lastPage.matches.number + 1,
         enabled: !!activeSearch,
     });
+
+    // 첫 페이지에서 프로필 정보 추출 (모든 페이지에서 동일)
+    const summonerProfile = data?.pages[0]?.profile;
 
     // 전적 갱신 뮤테이션
     const refreshMutation = useMutation({
@@ -90,7 +85,7 @@ const MatchesPage: React.FC = () => {
         }
     }, [searchInput]);
 
-    const allMatches = data?.pages.flatMap((page) => page.content) || [];
+    const allMatches = data?.pages.flatMap((page) => page.matches.content) || [];
 
     return (
         <div className="bg-[#1C1C1F] min-h-screen pb-20">

@@ -1,6 +1,6 @@
 import React from 'react';
 import Button from '../common/Button';
-import { UserResponse } from '../../types/api';
+import { UserResponse, getProfileIconUrl } from '../../types/api';
 import { SummonerProfileResponse } from '../../api/matches';
 
 interface SummonerProfileHeaderProps {
@@ -24,7 +24,7 @@ const SummonerProfileHeader: React.FC<SummonerProfileHeaderProps> = ({
     // 실제 데이터가 없으면 기본값 (또는 로딩 상태)
     const summonerLevel = summonerProfile?.summonerLevel ?? '-';
     // 프로필 아이콘 URL 사용 (없으면 기본값)
-    const profileIconUrl = summonerProfile?.profileIconUrl ?? `https://ddragon.leagueoflegends.com/cdn/14.23.1/img/profileicon/29.png`;
+    const profileIconUrl = summonerProfile?.profileIconUrl ?? getProfileIconUrl(29);
 
     // 랭킹 더미 데이터 (요청 사항)
     let displayLadderRank = "N/A";

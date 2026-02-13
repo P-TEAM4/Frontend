@@ -15,11 +15,16 @@ interface GetMatchesParams {
     sort?: string;
 }
 
-// 소환사 전적 조회
-export const getMatches = async (params: GetMatchesParams): Promise<PagedResponse<MatchResponse>> => {
+export interface MatchesWithProfileResponse {
+    profile: SummonerProfileResponse;
+    matches: PagedResponse<MatchResponse>;
+}
+
+// 소환사 전적 조회 (프로필 포함)
+export const getMatches = async (params: GetMatchesParams): Promise<MatchesWithProfileResponse> => {
     const { gameName, tagLine, page = 0, size = 20, sort = 'gameCreation,desc' } = params;
 
-    const response = await apiClient.get<ApiResponse<PagedResponse<MatchResponse>>>(
+    const response = await apiClient.get<ApiResponse<MatchesWithProfileResponse>>(
         `/matches/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
         {
             params: { page, size, sort },
@@ -72,31 +77,15 @@ export interface SummonerProfileResponse {
     flexLeague: LeagueInfo | null;
 }
 
-// 소환사 프로필 정보 조회 (티어, 레벨 등) - [수정] 백엔드 API 부재로 더미 데이터 처리
+// 소환사 프로필 정보 조회 (티어, 레벨 등)
 export const getSummonerInfo = async (gameName: string, tagLine: string): Promise<SummonerProfileResponse> => {
-    // API 호출 없이 바로 더미 데이터 반환 (추후 API 생기면 복구)
-    return Promise.resolve({
-        gameName,
-        tagLine,
-        summonerLevel: 0, // 알 수 없음
-        profileIconUrl: "https://ddragon.leagueoflegends.com/cdn/14.23.1/img/profileicon/29.png", // 기본 아이콘
-        soloLeague: {
-            queueType: "RANKED_SOLO_5x5",
-            tier: "UNRANKED",
-            rank: "",
-            leaguePoints: 0,
-            wins: 0,
-            losses: 0,
-            winRate: "0"
-        },
-        flexLeague: {
-            queueType: "RANKED_FLEX_SR",
-            tier: "UNRANKED",
-            rank: "",
-            leaguePoints: 0,
-            wins: 0,
-            losses: 0,
-            winRate: "0"
-        }
-    });
+    const response = await apiClient.get<ApiResponse<SummonerProfileResponse>>(
+        `/matches/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}/profile`
+    );
+
+    if (!response.data.data) {
+        throw new Error('소환사 정보를 불러올 수 없습니다.');
+    }
+
+    return response.data.data;
 };

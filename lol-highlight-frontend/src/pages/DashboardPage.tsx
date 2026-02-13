@@ -1,10 +1,11 @@
 // src/pages/DashboardPage.tsx
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '../store/authStore';
+import { useUser, useAuthStore } from '../store/authStore';
 import { getMatches } from '../api/matches';
 import { getPlayerHighlights } from '../api/highlights';
+import { unlinkRiot } from '../api/users';
 import MatchCard from '../components/matches/MatchCard';
 import Button from '../components/common/Button';
 import { formatRelativeTime } from '../types/api';
@@ -12,6 +13,9 @@ import { formatRelativeTime } from '../types/api';
 const DashboardPage: React.FC = () => {
     const navigate = useNavigate();
     const user = useUser();
+    const setUser = useAuthStore((state) => state.setUser);
+    const queryClient = useQueryClient();
+    const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
 
     // 최근 경기 조회 (연동된 경우만)
     const { data: recentMatches, isLoading: isLoadingMatches } = useQuery({
@@ -37,19 +41,18 @@ const DashboardPage: React.FC = () => {
         staleTime: 2 * 60 * 1000,
     });
 
-    // AI 분석 더미 데이터 (추후 실제 API 연결)
-    const aiAnalysis = {
-        winRate: user?.winRate || 0,
-        kda: user?.averageKda || 0,
-        mainPosition: 'Jungle',
-        feedback: [
-            "초반 갱킹 성공률이 75%로 매우 높습니다.",
-            "후반 시야 점수가 평균 대비 20% 낮습니다. 와드를 더 적극적으로 구매하세요.",
-            "리 신 플레이 시 Q 적중률이 상승세입니다."
-        ]
-    };
-
     const highlights = highlightsData?.content || [];
+
+    // Riot 계정 연동 해제 뮤테이션
+    const unlinkRiotMutation = useMutation({
+        mutationFn: unlinkRiot,
+        onSuccess: (updatedUser) => {
+            setUser(updatedUser);
+            setShowUnlinkConfirm(false);
+            queryClient.invalidateQueries({ queryKey: ['recentMatches'] });
+            queryClient.invalidateQueries({ queryKey: ['recentHighlights'] });
+        },
+    });
 
     if (!user) {
         return (
@@ -71,26 +74,48 @@ const DashboardPage: React.FC = () => {
                                 {user.name?.charAt(0) || 'U'}
                             </span>
                         </div>
-                        <div>
+                        <div className="flex-1">
                             <h2 className="text-xl font-bold text-white">{user.name}</h2>
                             <div className="text-[#00C8FF] font-semibold text-sm">
-                                {user.summonerName ? `${user.summonerName} #${user.tagLine}` : 'KR1'}
+                                {user.summonerName ? `${user.summonerName} #${user.tagLine}` : 'Riot 계정 미연동'}
                             </div>
+                            {user.summonerName && (
+                                <button
+                                    onClick={() => setShowUnlinkConfirm(true)}
+                                    className="mt-2 text-xs text-[#E84057] hover:text-[#FF5570] transition-colors"
+                                >
+                                    연동 해제
+                                </button>
+                            )}
                         </div>
                     </div>
 
                     <div className="space-y-4">
-                        <div className="bg-[#1C1C1F] p-4 rounded-lg">
-                            <div className="text-sm text-[#8B8B8B] mb-1">예상 승률</div>
-                            <div className="text-3xl font-bold text-[#00C8FF]">{aiAnalysis.winRate}%</div>
-                            <div className="w-full h-2 bg-gray-700 rounded-full mt-2 overflow-hidden">
-                                <div className="h-full bg-[#00C8FF]" style={{ width: `${aiAnalysis.winRate}%` }}></div>
+                        {user.winRate !== null && user.winRate !== undefined ? (
+                            <div className="bg-[#1C1C1F] p-4 rounded-lg">
+                                <div className="text-sm text-[#8B8B8B] mb-1">승률</div>
+                                <div className="text-3xl font-bold text-[#00C8FF]">{Math.round(user.winRate)}%</div>
+                                <div className="w-full h-2 bg-gray-700 rounded-full mt-2 overflow-hidden">
+                                    <div className="h-full bg-[#00C8FF]" style={{ width: `${user.winRate}%` }}></div>
+                                </div>
                             </div>
-                        </div>
-                        <div className="bg-[#1C1C1F] p-4 rounded-lg">
-                            <div className="text-sm text-[#8B8B8B] mb-1">최근 KDA</div>
-                            <div className="text-2xl font-bold text-white">{aiAnalysis.kda}</div>
-                        </div>
+                        ) : (
+                            <div className="bg-[#1C1C1F] p-4 rounded-lg">
+                                <div className="text-sm text-[#8B8B8B] mb-1">승률</div>
+                                <div className="text-lg text-[#5B5B5B]">데이터 없음</div>
+                            </div>
+                        )}
+                        {user.averageKda !== null && user.averageKda !== undefined ? (
+                            <div className="bg-[#1C1C1F] p-4 rounded-lg">
+                                <div className="text-sm text-[#8B8B8B] mb-1">평균 KDA</div>
+                                <div className="text-2xl font-bold text-white">{user.averageKda.toFixed(2)}</div>
+                            </div>
+                        ) : (
+                            <div className="bg-[#1C1C1F] p-4 rounded-lg">
+                                <div className="text-sm text-[#8B8B8B] mb-1">평균 KDA</div>
+                                <div className="text-lg text-[#5B5B5B]">데이터 없음</div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -103,16 +128,14 @@ const DashboardPage: React.FC = () => {
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                         AI 코칭 분석
                     </h3>
-                    <div className="space-y-3">
-                        {aiAnalysis.feedback.map((text, idx) => (
-                            <div key={idx} className="flex items-start gap-3 bg-[#0D1B2A]/50 p-3 rounded border border-[#1E3A5F]/50">
-                                <span className="text-[#C8AA6E] font-bold text-lg">{idx + 1}</span>
-                                <p className="text-[#F0F0F0] text-sm leading-relaxed">{text}</p>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="mt-4 text-right">
-                        <Button variant="ghost" size="sm" className="text-[#00C8FF] hover:text-white">상세 분석 보기 &rarr;</Button>
+                    <div className="flex flex-col items-center justify-center py-12">
+                        <svg className="w-16 h-16 text-[#1E3A5F] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                        </svg>
+                        <p className="text-[#8B8B8B] text-center">
+                            AI 코칭 분석 데이터를 수집중입니다.<br />
+                            <span className="text-sm">매치를 플레이하고 분석을 받아보세요!</span>
+                        </p>
                     </div>
                 </div>
             </div>
@@ -204,18 +227,49 @@ const DashboardPage: React.FC = () => {
                             <div key={i} className="h-20 bg-[#0D1B2A] rounded-lg animate-pulse" />
                         ))}
                     </div>
-                ) : recentMatches?.content.length === 0 ? (
+                ) : recentMatches?.matches.content.length === 0 ? (
                     <div className="text-center py-12 bg-[#0D1B2A] rounded-xl border border-[#1E3A5F]">
                         <p className="text-[#8B8B8B]">최근 경기 기록이 없습니다.</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {recentMatches?.content.map((match) => (
+                        {recentMatches?.matches.content.map((match) => (
                             <MatchCard key={match.id} match={match} />
                         ))}
                     </div>
                 )}
             </div>
+
+            {/* Riot 계정 연동 해제 확인 모달 */}
+            {showUnlinkConfirm && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                    <div className="bg-[#0D1B2A] rounded-xl border border-[#1E3A5F] p-6 max-w-md w-full">
+                        <h3 className="text-xl font-bold text-[#F0F0F0] mb-4">
+                            Riot 계정 연동 해제
+                        </h3>
+                        <p className="text-[#8B8B8B] mb-6">
+                            정말 Riot 계정 연동을 해제하시겠습니까?<br />
+                            연동을 해제하면 전적 및 하이라이트를 볼 수 없습니다.
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <Button
+                                variant="ghost"
+                                onClick={() => setShowUnlinkConfirm(false)}
+                            >
+                                취소
+                            </Button>
+                            <Button
+                                variant="primary"
+                                onClick={() => unlinkRiotMutation.mutate()}
+                                isLoading={unlinkRiotMutation.isPending}
+                                className="!bg-[#E84057] hover:!bg-[#FF5570]"
+                            >
+                                연동 해제
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

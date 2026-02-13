@@ -9,6 +9,9 @@ import DashboardPage from './pages/DashboardPage';
 import MatchesPage from './pages/MatchesPage';
 import MatchDetailPage from './pages/MatchDetailPage';
 import MyHighlightsPage from './pages/MyHighlightsPage';
+import SettingsPage from './pages/SettingsPage';
+import { getCachedDataDragonVersion } from './api/datadragon';
+import { setDataDragonVersion } from './types/api';
 
 // 인증이 필요한 라우트를 보호하는 컴포넌트
 const ProtectedRoute: React.FC = () => {
@@ -63,6 +66,44 @@ const App: React.FC = () => {
     }
   }, [isAuthenticated, user, logout]);
 
+  // Data Dragon 버전 초기화
+  React.useEffect(() => {
+    const initDataDragonVersion = async () => {
+      try {
+        const version = await getCachedDataDragonVersion();
+        setDataDragonVersion(version);
+        console.log('Data Dragon version initialized:', version);
+      } catch (error) {
+        console.error('Failed to initialize Data Dragon version:', error);
+      }
+    };
+
+    initDataDragonVersion();
+  }, []);
+
+  // 로그인 후 사용자 설정을 Electron에 적용
+  React.useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const syncSettingsToElectron = async () => {
+      try {
+        const { getUserSettings } = await import('./api/users');
+        const settings = await getUserSettings();
+        
+        // Electron에 설정 적용
+        if (typeof window !== 'undefined' && (window as any).require) {
+          const { ipcRenderer } = (window as any).require('electron');
+          await ipcRenderer.invoke('update-settings', settings);
+          console.log('Settings synced to Electron:', settings);
+        }
+      } catch (error) {
+        console.error('Failed to sync settings to Electron:', error);
+      }
+    };
+
+    syncSettingsToElectron();
+  }, [isAuthenticated, user]);
+
   return (
     <BrowserRouter>
       <Routes>
@@ -80,6 +121,7 @@ const App: React.FC = () => {
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/highlights" element={<MyHighlightsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Route>
 

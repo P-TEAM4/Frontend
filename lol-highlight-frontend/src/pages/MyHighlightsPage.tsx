@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getPlayerHighlights } from '../api/highlights';
-import { linkRiot } from '../api/users';
+import { linkRiot, unlinkRiot } from '../api/users';
 import { useUser, useAuthStore } from '../store/authStore';
 import type { HighlightResponse, HighlightType } from '../types/api';
 import HighlightCard from '../components/highlights/HighlightCard';
@@ -28,8 +28,11 @@ const MyHighlightsPage: React.FC = () => {
     // Riot 계정 연동 폼
     const [showLinkForm, setShowLinkForm] = useState(false);
     const [summonerName, setSummonerName] = useState('');
-    const [tagLine, setTagLine] = useState('');
+    const [tagLine, setTagLine] = useState('KR1');
     const [linkError, setLinkError] = useState<string | null>(null);
+    
+    // Riot 계정 연동 해제
+    const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
 
     const puuid = user?.puuid || '';
 
@@ -40,12 +43,22 @@ const MyHighlightsPage: React.FC = () => {
             setUser(updatedUser);
             setShowLinkForm(false);
             setSummonerName('');
-            setTagLine('');
+            setTagLine('KR1');
             setLinkError(null);
             queryClient.invalidateQueries({ queryKey: ['playerHighlights'] });
         },
         onError: (error: Error) => {
             setLinkError(error.message || 'Riot 계정 연동에 실패했습니다.');
+        },
+    });
+
+    // Riot 계정 연동 해제 뮤테이션
+    const unlinkRiotMutation = useMutation({
+        mutationFn: unlinkRiot,
+        onSuccess: (updatedUser) => {
+            setUser(updatedUser);
+            setShowUnlinkConfirm(false);
+            queryClient.invalidateQueries({ queryKey: ['playerHighlights'] });
         },
     });
 
@@ -115,6 +128,11 @@ const MyHighlightsPage: React.FC = () => {
                                     placeholder="태그"
                                     value={tagLine}
                                     onChange={(e) => setTagLine(e.target.value)}
+                                    onFocus={(e) => {
+                                        if (e.target.value === 'KR1') {
+                                            setTagLine('');
+                                        }
+                                    }}
                                     className="w-24 px-4 py-3 bg-[#112240] border border-[#1E3A5F] rounded-lg text-[#F0F0F0] placeholder-[#5B5B5B] focus:outline-none focus:border-[#00C8FF]"
                                 />
                             </div>
@@ -150,13 +168,25 @@ const MyHighlightsPage: React.FC = () => {
     return (
         <div>
             {/* 헤더 */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-[#F0F0F0] mb-2">
-                    내 하이라이트
-                </h1>
-                <p className="text-[#8B8B8B]">
-                    나의 멋진 플레이 순간들을 확인하세요
-                </p>
+            <div className="mb-8 flex justify-between items-start">
+                <div>
+                    <h1 className="text-3xl font-bold text-[#F0F0F0] mb-2">
+                        내 하이라이트
+                    </h1>
+                    <p className="text-[#8B8B8B]">
+                        나의 멋진 플레이 순간들을 확인하세요
+                    </p>
+                </div>
+                {user?.summonerName && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowUnlinkConfirm(true)}
+                        className="!text-[#E84057] hover:!text-[#FF5570]"
+                    >
+                        Riot 계정 연동 해제
+                    </Button>
+                )}
             </div>
 
             {/* 필터 */}
@@ -262,6 +292,37 @@ const MyHighlightsPage: React.FC = () => {
                     highlight={selectedHighlight}
                     onClose={() => setSelectedHighlight(null)}
                 />
+            )}
+
+            {/* Riot 계정 연동 해제 확인 모달 */}
+            {showUnlinkConfirm && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+                    <div className="bg-[#0D1B2A] rounded-xl border border-[#1E3A5F] p-6 max-w-md w-full">
+                        <h3 className="text-xl font-bold text-[#F0F0F0] mb-4">
+                            Riot 계정 연동 해제
+                        </h3>
+                        <p className="text-[#8B8B8B] mb-6">
+                            정말 Riot 계정 연동을 해제하시겠습니까?<br />
+                            연동을 해제하면 하이라이트 및 전적을 볼 수 없습니다.
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <Button
+                                variant="ghost"
+                                onClick={() => setShowUnlinkConfirm(false)}
+                            >
+                                취소
+                            </Button>
+                            <Button
+                                variant="primary"
+                                onClick={() => unlinkRiotMutation.mutate()}
+                                isLoading={unlinkRiotMutation.isPending}
+                                className="!bg-[#E84057] hover:!bg-[#FF5570]"
+                            >
+                                연동 해제
+                            </Button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

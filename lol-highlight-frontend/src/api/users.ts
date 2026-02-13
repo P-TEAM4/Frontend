@@ -58,3 +58,27 @@ export const unlinkRiot = async (): Promise<UserResponse> => {
 export const deleteUser = async (): Promise<void> => {
     await apiClient.delete('/users');
 };
+
+// 사용자 설정 타입
+export interface UserSettings {
+    autoLaunch: boolean;
+    autoShowOnLol: boolean;
+}
+
+// 사용자 설정 조회
+export const getUserSettings = async (): Promise<UserSettings> => {
+    const response = await apiClient.get<ApiResponse<UserSettings>>('/users/settings');
+    if (!response.data.data) {
+        throw new Error('설정을 불러올 수 없습니다.');
+    }
+    return response.data.data;
+};
+
+// 사용자 설정 업데이트
+export const updateUserSettings = async (settings: UserSettings): Promise<UserSettings> => {
+    const response = await apiClient.put<ApiResponse<UserSettings>>('/users/settings', settings);
+    if (!response.data.data) {
+        throw new Error('설정 업데이트에 실패했습니다.');
+    }
+    return response.data.data;
+};

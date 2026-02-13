@@ -210,14 +210,30 @@ export type ErrorCode =
     | 'INTERNAL_SERVER_ERROR'
     | 'EXTERNAL_API_ERROR';
 
+// Data Dragon 버전 (서버에서 동적으로 가져옴)
+let DDRAGON_VERSION = '15.2.1'; // 폴백 기본값
+
+// Data Dragon 버전 설정 (초기화 시 호출)
+export const setDataDragonVersion = (version: string) => {
+    DDRAGON_VERSION = version;
+};
+
+// 현재 버전 조회
+export const getDataDragonVersion = () => DDRAGON_VERSION;
+
 // 챔피언 아이콘 URL 헬퍼
 export const getChampionIconUrl = (championName: string): string => {
-    return `https://ddragon.leagueoflegends.com/cdn/14.23.1/img/champion/${championName}.png`;
+    return `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/champion/${championName}.png`;
 };
 
 // 아이템 아이콘 URL 헬퍼
 export const getItemIconUrl = (itemId: number): string => {
-    return `https://ddragon.leagueoflegends.com/cdn/14.23.1/img/item/${itemId}.png`;
+    return `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/item/${itemId}.png`;
+};
+
+// 프로필 아이콘 URL 헬퍼
+export const getProfileIconUrl = (iconId: number): string => {
+    return `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/profileicon/${iconId}.png`;
 };
 
 // KDA 등급 계산
