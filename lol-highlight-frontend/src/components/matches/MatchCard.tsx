@@ -3,11 +3,11 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { MatchResponse } from '../../types/api';
 import {
-    getChampionIconUrl,
-    getItemIconUrl,
     formatRelativeTime,
     formatGameDuration
 } from '../../types/api';
+import ItemImage from '../common/ItemImage';
+import ChampionImage from '../common/ChampionImage';
 
 interface MatchCardProps {
     match: MatchResponse;
@@ -38,10 +38,11 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, hasHighlights = false }) =
             {/* 2. 챔피언 및 스펠 (현재 스펠/룬 없음) */}
             <div className="w-24 py-3 flex flex-col items-center justify-center gap-2 shrink-0">
                 <div className="relative group">
-                    <img
-                        src={getChampionIconUrl(match.championName)}
-                        alt={match.championName}
+                    <ChampionImage
+                        championName={match.championName}
+                        gameVersion={match.gameVersion}
                         className="w-12 h-12 rounded-full"
+                        alt={match.championName}
                     />
                 </div>
                 <div className="text-xs text-[#9E9EB1] truncate w-full text-center">
@@ -70,31 +71,23 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, hasHighlights = false }) =
             {/* 4. 아이템 (데이터 연동) */}
             <div className="flex-1 py-3 flex items-center pl-4 gap-1">
                 {[match.item0, match.item1, match.item2, match.item3, match.item4, match.item5].map((item, i) => (
-                    <div key={i} className={`w-6 h-6 rounded-sm ${match.win ? 'bg-[#2F436E]' : 'bg-[#703C47]'} overflow-hidden`}>
-                        {item !== 0 && (
-                            <img
-                                src={getItemIconUrl(item)}
-                                alt={`Item ${item}`}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                }}
-                            />
-                        )}
+                    <div key={i} className={`w-6 h-6 rounded-sm ${match.win ? 'bg-[#2F436E]' : 'bg-[#703C47]'} overflow-hidden flex items-center justify-center`}>
+                        <ItemImage
+                            itemId={item}
+                            gameVersion={match.gameVersion}
+                            className="w-full h-full object-cover"
+                            alt={`Item ${item}`}
+                        />
                     </div>
                 ))}
                 {/* 장신구 (item6) */}
-                <div className={`w-6 h-6 rounded-full ml-1 ${match.win ? 'bg-[#2F436E]' : 'bg-[#703C47]'} overflow-hidden`}>
-                    {match.item6 !== 0 && (
-                        <img
-                            src={getItemIconUrl(match.item6)}
-                            alt={`Trinket ${match.item6}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                        />
-                    )}
+                <div className={`w-6 h-6 rounded-full ml-1 ${match.win ? 'bg-[#2F436E]' : 'bg-[#703C47]'} overflow-hidden flex items-center justify-center`}>
+                    <ItemImage
+                        itemId={match.item6}
+                        gameVersion={match.gameVersion}
+                        className="w-full h-full object-cover"
+                        alt={`Trinket ${match.item6}`}
+                    />
                 </div>
             </div>
 

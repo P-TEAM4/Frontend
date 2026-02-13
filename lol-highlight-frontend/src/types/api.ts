@@ -80,15 +80,16 @@ export interface MatchResponse {
     win: boolean;
     gameDuration: number;
     gameCreation: number;
-    status: MatchStatus;
+    status: string;
     createdAt: string;
-    item0: number;
-    item1: number;
-    item2: number;
-    item3: number;
-    item4: number;
-    item5: number;
-    item6: number;
+    item0: number | null;
+    item1: number | null;
+    item2: number | null;
+    item3: number | null;
+    item4: number | null;
+    item5: number | null;
+    item6: number | null;
+    gameVersion: string | null;
 }
 
 export interface ItemBuild {
