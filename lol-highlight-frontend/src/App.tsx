@@ -10,8 +10,8 @@ import MatchesPage from './pages/MatchesPage';
 import MatchDetailPage from './pages/MatchDetailPage';
 import MyHighlightsPage from './pages/MyHighlightsPage';
 import SettingsPage from './pages/SettingsPage';
-import { getCachedDataDragonVersion } from './api/datadragon';
-import { setDataDragonVersion } from './types/api';
+import { getCachedDataDragonVersion, getCachedVersionsList } from './api/datadragon';
+import { setDataDragonVersion, setDataDragonVersionsList } from './types/api';
 
 // 인증이 필요한 라우트를 보호하는 컴포넌트
 const ProtectedRoute: React.FC = () => {
@@ -74,8 +74,11 @@ const App: React.FC = () => {
     const initDataDragonVersion = async () => {
       try {
         const version = await getCachedDataDragonVersion();
+        const versionsList = await getCachedVersionsList();
         setDataDragonVersion(version);
+        setDataDragonVersionsList(versionsList);
         console.log('Data Dragon version initialized:', version);
+        console.log('Data Dragon versions list cached:', versionsList.slice(0, 5));
       } catch (error) {
         console.error('Failed to initialize Data Dragon version:', error);
       }

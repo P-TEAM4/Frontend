@@ -212,15 +212,24 @@ export type ErrorCode =
     | 'EXTERNAL_API_ERROR';
 
 // Data Dragon 버전 (서버에서 동적으로 가져옴)
-let DDRAGON_VERSION = '15.2.1'; // 폴백 기본값
+let DDRAGON_VERSION = '16.3.1'; // 폴백 기본값
+let DDRAGON_VERSIONS_LIST: string[] = ['16.3.1', '15.24.1', '14.23.1', '13.24.1']; // 폴백 이전 버전 목록
 
 // Data Dragon 버전 설정 (초기화 시 호출)
 export const setDataDragonVersion = (version: string) => {
     DDRAGON_VERSION = version;
 };
 
+// Data Dragon 버전 목록 설정 (초기화 시 호출)
+export const setDataDragonVersionsList = (versions: string[]) => {
+    DDRAGON_VERSIONS_LIST = versions;
+};
+
 // 현재 버전 조회
 export const getDataDragonVersion = () => DDRAGON_VERSION;
+
+// 버전 목록 조회
+export const getDataDragonVersionsList = () => DDRAGON_VERSIONS_LIST;
 
 // 챔피언 아이콘 URL 헬퍼
 export const getChampionIconUrl = (championName: string): string => {

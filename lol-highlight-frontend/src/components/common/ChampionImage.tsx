@@ -1,6 +1,6 @@
 // src/components/common/ChampionImage.tsx
 import React, { useState } from 'react';
-import { getDataDragonVersion } from '../../types/api';
+import { getDataDragonVersion, getDataDragonVersionsList } from '../../types/api';
 
 interface ChampionImageProps {
     championName: string;
@@ -43,8 +43,9 @@ const getChampionImageSources = (championName: string, gameVersion?: string | nu
     // 4. Community Dragon (latest)
     sources.push(`https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${championName.toLowerCase()}.png`);
 
-    // 5. 이전 버전 Data Dragon (오래된 챔피언)
-    const previousVersions = ['14.23.1', '14.1.1', '13.24.1'];
+    // 5. 이전 버전 Data Dragon (동적으로 가져온 버전 목록에서 1~4번째 사용)
+    const allVersions = getDataDragonVersionsList();
+    const previousVersions = allVersions.slice(1, 5); // 최신 제외, 다음 4개 버전
     previousVersions.forEach(version => {
         sources.push(`https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championName}.png`);
     });

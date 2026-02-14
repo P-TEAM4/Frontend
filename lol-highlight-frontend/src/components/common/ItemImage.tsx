@@ -1,6 +1,6 @@
 // src/components/common/ItemImage.tsx
 import React, { useState } from 'react';
-import { getDataDragonVersion } from '../../types/api';
+import { getDataDragonVersion, getDataDragonVersionsList } from '../../types/api';
 
 interface ItemImageProps {
     itemId: number | null;
@@ -37,8 +37,9 @@ const getItemImageSources = (itemId: number, gameVersion?: string | null): strin
     const currentVersion = getDataDragonVersion();
     sources.push(`https://ddragon.leagueoflegends.com/cdn/${currentVersion}/img/item/${itemId}.png`);
 
-    // 3. 이전 버전들 (14.x, 13.x, 12.x)
-    const previousVersions = ['14.23.1', '13.24.1', '12.23.1'];
+    // 3. 이전 버전들 (동적으로 가져온 버전 목록에서 1~4번째 사용)
+    const allVersions = getDataDragonVersionsList();
+    const previousVersions = allVersions.slice(1, 5); // 최신 제외, 다음 4개 버전
     previousVersions.forEach(version => {
         sources.push(`https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemId}.png`);
     });
