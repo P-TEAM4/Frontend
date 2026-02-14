@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore, useUser } from '../store/authStore';
-import { updateUser, deleteUser, linkRiot, unlinkRiot, getUserSettings, updateUserSettings } from '../api/users';
+import { updateUser, deleteUser, linkRiot, unlinkRiot, getUserSettings, updateUserSettings, uploadProfileImage } from '../api/users';
 import { logout } from '../api/auth';
 import Button from '../components/common/Button';
 
@@ -17,6 +17,10 @@ const SettingsPage: React.FC = () => {
     const [isEditingProfile, setIsEditingProfile] = useState(false);
     const [editName, setEditName] = useState(user?.name || '');
     const [editProfileImage, setEditProfileImage] = useState(user?.profileImage || '');
+    
+    // 프로필 이미지 업로드 상태
+    const [selectedImage, setSelectedImage] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
 
     // Riot 연동 상태
     const [isLinkingRiot, setIsLinkingRiot] = useState(false);
@@ -38,6 +42,18 @@ const SettingsPage: React.FC = () => {
         mutationFn: updateUser,
         onSuccess: (updatedUser) => {
             updateUserStore(updatedUser);
+            setIsEditingProfile(false);
+            queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+        },
+    });
+
+    // 프로필 이미지 업로드 Mutation (POST /api/users/profile-image)
+    const uploadImageMutation = useMutation({
+        mutationFn: uploadProfileImage,
+        onSuccess: (updatedUser) => {
+            updateUserStore(updatedUser);
+            setSelectedImage(null);
+            setImagePreview(null);
             setIsEditingProfile(false);
             queryClient.invalidateQueries({ queryKey: ['currentUser'] });
         },
@@ -80,10 +96,44 @@ const SettingsPage: React.FC = () => {
 
     const handleUpdateProfile = () => {
         if (!editName.trim()) return;
+        
+        // 이미지 파일이 선택된 경우, 업로드 먼저 수행
+        if (selectedImage) {
+            uploadImageMutation.mutate(selectedImage);
+            return;
+        }
+        
+        // 이미지 없으면 일반 프로필 수정
         updateUserMutation.mutate({
             name: editName.trim(),
             ...(editProfileImage.trim() ? { profileImage: editProfileImage.trim() } : {}),
         });
+    };
+
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // 파일 타입 검증
+        if (!file.type.match(/^image\/(jpeg|png)$/)) {
+            alert('JPEG 또는 PNG 형식의 이미지만 업로드 가능합니다.');
+            return;
+        }
+
+        // 파일 크기 검증 (5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('파일 크기는 5MB를 초과할 수 없습니다.');
+            return;
+        }
+
+        setSelectedImage(file);
+
+        // 이미지 미리보기
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setImagePreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
     };
 
     const handleLinkRiot = () => {
@@ -222,7 +272,47 @@ const SettingsPage: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-[#8B8B8B] mb-2">프로필 이미지 URL (선택)</label>
+                                <label className="block text-sm font-medium text-[#8B8B8B] mb-2">프로필 이미지 업로드</label>
+                                <div className="space-y-3">
+                                    {/* 이미지 미리보기 */}
+                                    {imagePreview && (
+                                        <div className="flex items-center gap-3">
+                                            <img
+                                                src={imagePreview}
+                                                alt="미리보기"
+                                                className="w-20 h-20 rounded-full object-cover border-2 border-[#C8AA6E]"
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedImage(null);
+                                                    setImagePreview(null);
+                                                }}
+                                                className="text-sm text-[#E84057] hover:text-[#FF6B81]"
+                                            >
+                                                삭제
+                                            </button>
+                                        </div>
+                                    )}
+                                    
+                                    {/* 파일 선택 버튼 */}
+                                    <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1E3A5F] hover:bg-[#2A4A6F] text-white text-sm font-medium cursor-pointer transition-colors">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        이미지 선택
+                                        <input
+                                            type="file"
+                                            accept="image/jpeg,image/png"
+                                            onChange={handleImageSelect}
+                                            className="hidden"
+                                            id="profile-image-upload"
+                                        />
+                                    </label>
+                                    <p className="text-xs text-[#8B8B8B]">JPEG, PNG 형식 / 최대 5MB</p>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-[#8B8B8B] mb-2">또는 프로필 이미지 URL</label>
                                 <input
                                     type="url"
                                     value={editProfileImage}
@@ -230,6 +320,7 @@ const SettingsPage: React.FC = () => {
                                     className="input"
                                     placeholder="https://example.com/avatar.png"
                                     id="edit-profile-image-input"
+                                    disabled={!!selectedImage}
                                 />
                             </div>
                             <div className="flex items-center gap-3 pt-2">
@@ -237,11 +328,11 @@ const SettingsPage: React.FC = () => {
                                     variant="primary"
                                     size="sm"
                                     onClick={handleUpdateProfile}
-                                    isLoading={updateUserMutation.isPending}
+                                    isLoading={updateUserMutation.isPending || uploadImageMutation.isPending}
                                     disabled={!editName.trim()}
                                     id="save-profile-btn"
                                 >
-                                    저장
+                                    {uploadImageMutation.isPending ? '업로드 중...' : '저장'}
                                 </Button>
                                 <Button
                                     variant="ghost"
@@ -250,15 +341,20 @@ const SettingsPage: React.FC = () => {
                                         setIsEditingProfile(false);
                                         setEditName(user.name);
                                         setEditProfileImage(user.profileImage || '');
+                                        setSelectedImage(null);
+                                        setImagePreview(null);
                                     }}
                                     id="cancel-edit-btn"
                                 >
                                     취소
                                 </Button>
                             </div>
-                            {updateUserMutation.isError && (
+                            {(updateUserMutation.isError || uploadImageMutation.isError) && (
                                 <p className="text-sm text-[#E84057]">
-                                    프로필 수정에 실패했습니다. 다시 시도해주세요.
+                                    {uploadImageMutation.isError 
+                                        ? '이미지 업로드에 실패했습니다. 파일 형식과 크기를 확인해주세요.'
+                                        : '프로필 수정에 실패했습니다. 다시 시도해주세요.'
+                                    }
                                 </p>
                             )}
                         </div>

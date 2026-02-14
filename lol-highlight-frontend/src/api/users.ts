@@ -59,6 +59,27 @@ export const deleteUser = async (): Promise<void> => {
     await apiClient.delete('/users');
 };
 
+// 프로필 이미지 업로드
+export const uploadProfileImage = async (file: File): Promise<UserResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await apiClient.post<ApiResponse<UserResponse>>(
+        '/users/profile-image',
+        formData,
+        {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        }
+    );
+    
+    if (!response.data.data) {
+        throw new Error('프로필 이미지 업로드에 실패했습니다.');
+    }
+    return response.data.data;
+};
+
 // 사용자 설정 타입
 export interface UserSettings {
     autoLaunch: boolean;
