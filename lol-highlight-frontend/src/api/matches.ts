@@ -45,6 +45,21 @@ export const refreshMatches = async (gameName: string, tagLine: string): Promise
     );
 };
 
+// 추가 전적 불러오기
+export const loadMoreMatches = async (
+    gameName: string,
+    tagLine: string,
+    startIndex: number
+): Promise<void> => {
+    await apiClient.post(
+        `/matches/summoner/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}/load-more`,
+        null,
+        {
+            params: { startIndex }
+        }
+    );
+};
+
 // 매치 상세 정보 조회
 export const getMatchDetail = async (matchId: string): Promise<MatchDetailResponse> => {
     const response = await apiClient.get<ApiResponse<MatchDetailResponse>>(

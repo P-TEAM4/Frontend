@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import { getMatches, refreshMatches } from '../api/matches';
+import { getMatches, refreshMatches, loadMoreMatches } from '../api/matches';
 import { getCurrentUser } from '../api/users';
 import { useAuthStore } from '../store/authStore';
 import MatchCard from '../components/matches/MatchCard';
@@ -22,6 +22,7 @@ const MatchesPage: React.FC = () => {
     const [searchInput, setSearchInput] = useState('');
     const [previousMatchCount, setPreviousMatchCount] = useState(0);
     const [allMatchesLoaded, setAllMatchesLoaded] = useState(false);
+    const [totalMatchesFetched, setTotalMatchesFetched] = useState(0);
 
     // URL params에서 자동 검색 실행
     useEffect(() => {
@@ -62,6 +63,14 @@ const MatchesPage: React.FC = () => {
         enabled: !!activeSearch,
     });
 
+    // 전체 로드된 전적 개수 추적
+    useEffect(() => {
+        if (data) {
+            const total = data.pages.flatMap(p => p.matches.content).length;
+            setTotalMatchesFetched(total);
+        }
+    }, [data]);
+
     // 첫 페이지에서 프로필 정보 추출
     const summonerProfile = data?.pages[0]?.profile;
 
@@ -76,10 +85,18 @@ const MatchesPage: React.FC = () => {
 
     // 추가 전적 가져오기 (Riot API 호출)
     const loadMoreMutation = useMutation({
-        mutationFn: () => {
+        mutationFn: async () => {
+            if (!activeSearch) return;
+            
             // 현재 전적 개수 저장
-            setPreviousMatchCount(allMatches.length);
-            return refreshMatches(activeSearch!.gameName, activeSearch!.tagLine);
+            setPreviousMatchCount(totalMatchesFetched);
+            
+            // startIndex로 현재 전적 개수 전달
+            return loadMoreMatches(
+                activeSearch.gameName,
+                activeSearch.tagLine,
+                totalMatchesFetched
+            );
         },
         onSuccess: async () => {
             // 쿼리 무효화하여 재조회
