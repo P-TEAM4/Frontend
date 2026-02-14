@@ -9,6 +9,7 @@ import DashboardPage from './pages/DashboardPage';
 import MatchesPage from './pages/MatchesPage';
 import MatchDetailPage from './pages/MatchDetailPage';
 import MyHighlightsPage from './pages/MyHighlightsPage';
+import ChampionStatsPage from './pages/ChampionStatsPage';
 import SettingsPage from './pages/SettingsPage';
 import { getCachedDataDragonVersion, getCachedVersionsList } from './api/datadragon';
 import { setDataDragonVersion, setDataDragonVersionsList } from './types/api';
@@ -128,6 +129,7 @@ const App: React.FC = () => {
         <Route element={<PublicLayout />}>
           <Route path="/matches" element={<MatchesPage />} />
           <Route path="/match/:matchId" element={<MatchDetailPage />} />
+          <Route path="/champions" element={<ChampionStatsPage />} />
         </Route>
 
         {/* 인증 필요 라우트 */}

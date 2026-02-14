@@ -16,7 +16,6 @@ const SettingsPage: React.FC = () => {
     // 프로필 편집 상태
     const [isEditingProfile, setIsEditingProfile] = useState(false);
     const [editName, setEditName] = useState(user?.name || '');
-    const [editProfileImage, setEditProfileImage] = useState(user?.profileImage || '');
     
     // 프로필 이미지 업로드 상태
     const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -103,10 +102,9 @@ const SettingsPage: React.FC = () => {
             return;
         }
         
-        // 이미지 없으면 일반 프로필 수정
+        // 이미지 없으면 이름만 업데이트
         updateUserMutation.mutate({
             name: editName.trim(),
-            ...(editProfileImage.trim() ? { profileImage: editProfileImage.trim() } : {}),
         });
     };
 
@@ -311,18 +309,6 @@ const SettingsPage: React.FC = () => {
                                     <p className="text-xs text-[#8B8B8B]">JPEG, PNG 형식 / 최대 5MB</p>
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-[#8B8B8B] mb-2">또는 프로필 이미지 URL</label>
-                                <input
-                                    type="url"
-                                    value={editProfileImage}
-                                    onChange={(e) => setEditProfileImage(e.target.value)}
-                                    className="input"
-                                    placeholder="https://example.com/avatar.png"
-                                    id="edit-profile-image-input"
-                                    disabled={!!selectedImage}
-                                />
-                            </div>
                             <div className="flex items-center gap-3 pt-2">
                                 <Button
                                     variant="primary"
@@ -340,7 +326,6 @@ const SettingsPage: React.FC = () => {
                                     onClick={() => {
                                         setIsEditingProfile(false);
                                         setEditName(user.name);
-                                        setEditProfileImage(user.profileImage || '');
                                         setSelectedImage(null);
                                         setImagePreview(null);
                                     }}
@@ -388,7 +373,6 @@ const SettingsPage: React.FC = () => {
                                 size="sm"
                                 onClick={() => {
                                     setEditName(user.name);
-                                    setEditProfileImage(user.profileImage || '');
                                     setIsEditingProfile(true);
                                 }}
                                 id="edit-profile-btn"
@@ -601,12 +585,12 @@ const SettingsPage: React.FC = () => {
                                 </button>
                             </div>
 
-                            {/* 롤 실행 시 자동 표시 */}
+                            {/* 롤 실행 시 자동 실행 */}
                             <div className="flex items-center justify-between py-3">
                                 <div>
-                                    <div className="text-white font-medium">롤 런처 실행 시 자동 표시</div>
+                                    <div className="text-white font-medium">롤 런처 실행 시 자동 실행</div>
                                     <div className="text-sm text-[#8B8B8B] mt-1">
-                                        League of Legends 런처 실행 시 앱 창이 자동으로 표시됩니다
+                                        League of Legends 런처 실행 시 앱이 자동으로 실행됩니다
                                     </div>
                                 </div>
                                 <button
@@ -622,25 +606,6 @@ const SettingsPage: React.FC = () => {
                                         }`}
                                     />
                                 </button>
-                            </div>
-
-                            {/* 안내 메시지 */}
-                            <div className="mt-4 p-4 rounded-lg bg-[#050816] border border-[#1E3A5F]">
-                                <div className="flex items-start gap-3">
-                                    <div className="text-[#00C8FF] mt-1">
-                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                        </svg>
-                                    </div>
-                                    <div className="text-sm text-[#9E9EB1]">
-                                        <p className="font-semibold text-white mb-2">💡 사용 방법</p>
-                                        <ul className="space-y-1 list-disc list-inside">
-                                            <li><strong className="text-[#00C8FF]">"컴퓨터 시작 시 자동 실행"</strong>을 켜두면 앱이 백그라운드에서 항상 실행됩니다</li>
-                                            <li><strong className="text-[#00C8FF]">"롤 런처 실행 시 자동 표시"</strong>를 켜면 롤 런처 감지 시 창이 자동으로 나타납니다</li>
-                                            <li>앱이 완전히 꺼진 상태에서는 롤을 감지할 수 없습니다</li>
-                                        </ul>
-                                    </div>
-                                </div>
                             </div>
                         </>
                     )}
