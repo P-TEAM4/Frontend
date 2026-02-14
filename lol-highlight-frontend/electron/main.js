@@ -1,16 +1,20 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } = require('electron');
 const path = require('path');
 const { exec } = require('child_process');
+const lcuConnector = require('./lcu-connector');
 
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
 let lolMonitorInterval = null;
+let championCheckInterval = null;
+let lastNotifiedChampion = null; // 중복 알림 방지
 
 // 설정 (메모리에만 저장, 백엔드에서 동기화)
 let appSettings = {
     autoLaunch: false,
     autoShowOnLol: true,
+    showChampionStats: true, // 인게임 챔피언 통계 자동 표시
 };
 
 function createWindow() {
@@ -103,7 +107,7 @@ function createTray() {
 }
 
 // 롤 런처 프로세스 감지
-function checkLeagueClient() {
+async function checkLeagueClient() {
     // 설정에서 자동 표시가 비활성화된 경우 체크하지 않음
     if (!appSettings.autoShowOnLol) {
         console.log('[LOL Monitor] Auto-show disabled, skipping check');
@@ -122,7 +126,7 @@ function checkLeagueClient() {
     console.log(`[LOL Monitor] Checking for process: ${processName}`);
     console.log(`[LOL Monitor] Command: ${command}`);
 
-    exec(command, (error, stdout, stderr) => {
+    exec(command, async (error, stdout, stderr) => {
         console.log(`[LOL Monitor] Error: ${error}`);
         console.log(`[LOL Monitor] Stdout: ${stdout}`);
         console.log(`[LOL Monitor] Stderr: ${stderr}`);
@@ -139,8 +143,16 @@ function checkLeagueClient() {
             } else {
                 console.log('[LOL Monitor] Window already visible');
             }
+
+            // LCU 연결 시도 및 챔피언 모니터링 시작
+            const connected = await lcuConnector.connect();
+            if (connected && appSettings.showChampionStats) {
+                startChampionMonitoring();
+            }
         } else {
             console.log('[LOL Monitor] League of Legends not detected');
+            // 롤이 종료되면 챔피언 모니터링도 중지
+            stopChampionMonitoring();
         }
     });
 }
@@ -158,6 +170,56 @@ function stopLeagueMonitoring() {
     if (lolMonitorInterval) {
         clearInterval(lolMonitorInterval);
         lolMonitorInterval = null;
+    }
+    stopChampionMonitoring();
+}
+
+// 챔피언 선택 감지
+async function monitorChampionSelect() {
+    // 설정에서 비활성화된 경우 체크하지 않음
+    if (!appSettings.showChampionStats) {
+        return;
+    }
+
+    try {
+        const champion = await lcuConnector.getCurrentChampion();
+        
+        if (champion && champion !== lastNotifiedChampion) {
+            console.log('[Champion Monitor] Champion selected:', champion);
+            
+            // 프론트엔드로 챔피언 정보 전송
+            if (mainWindow && mainWindow.webContents) {
+                mainWindow.webContents.send('champion-selected', champion);
+            }
+            
+            lastNotifiedChampion = champion;
+        } else if (!champion && lastNotifiedChampion) {
+            // 챔피언 선택이 취소됨
+            console.log('[Champion Monitor] Champion selection cleared');
+            lastNotifiedChampion = null;
+        }
+    } catch (err) {
+        console.error('[Champion Monitor] Error:', err.message);
+    }
+}
+
+// 챔피언 모니터링 시작
+function startChampionMonitoring() {
+    if (!championCheckInterval) {
+        console.log('[Champion Monitor] Starting champion monitoring...');
+        championCheckInterval = setInterval(monitorChampionSelect, 2000); // 2초마다 체크
+        monitorChampionSelect(); // 즉시 한 번 실행
+    }
+}
+
+// 챔피언 모니터링 중지
+function stopChampionMonitoring() {
+    if (championCheckInterval) {
+        console.log('[Champion Monitor] Stopping champion monitoring...');
+        clearInterval(championCheckInterval);
+        championCheckInterval = null;
+        lastNotifiedChampion = null;
+        lcuConnector.disconnect();
     }
 }
 

@@ -1,5 +1,5 @@
 // src/App.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useIsAuthenticated, useAuthStore } from './store/authStore';
 import Header from './components/layout/Header';
@@ -11,6 +11,7 @@ import MatchDetailPage from './pages/MatchDetailPage';
 import MyHighlightsPage from './pages/MyHighlightsPage';
 import ChampionStatsPage from './pages/ChampionStatsPage';
 import SettingsPage from './pages/SettingsPage';
+import ChampionStatsOverlay from './components/overlay/ChampionStatsOverlay';
 import { getCachedDataDragonVersion, getCachedVersionsList } from './api/datadragon';
 import { setDataDragonVersion, setDataDragonVersionsList } from './types/api';
 
@@ -61,6 +62,7 @@ const PublicLayout: React.FC = () => {
 
 const App: React.FC = () => {
   const { isAuthenticated, user, logout } = useAuthStore();
+  const [selectedChampion, setSelectedChampion] = useState<string | null>(null);
 
   React.useEffect(() => {
     // 토큰은 있는데 사용자 정보가 없는 경우 (로그인 과정 중 오류 발생 등)
@@ -119,9 +121,40 @@ const App: React.FC = () => {
     syncSettingsToElectron();
   }, [isAuthenticated, user]);
 
+  // Champion selection IPC listener
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).require) {
+      try {
+        const { ipcRenderer } = (window as any).require('electron');
+        
+        const handleChampionSelected = (_event: any, championName: string) => {
+          console.log('Champion selected via IPC:', championName);
+          setSelectedChampion(championName);
+        };
+
+        ipcRenderer.on('champion-selected', handleChampionSelected);
+
+        return () => {
+          ipcRenderer.removeListener('champion-selected', handleChampionSelected);
+        };
+      } catch (error) {
+        console.warn('Failed to setup champion-selected IPC listener:', error);
+      }
+    }
+  }, []);
+
   return (
-    <BrowserRouter>
-      <Routes>
+    <>
+      {/* Champion Stats Overlay (Floating) */}
+      {selectedChampion && (
+        <ChampionStatsOverlay
+          championName={selectedChampion}
+          onClose={() => setSelectedChampion(null)}
+        />
+      )}
+
+      <BrowserRouter>
+        <Routes>
         {/* 로그인 페이지 - 별도 레이아웃 */}
         <Route path="/login" element={<LoginPage />} />
 
@@ -144,8 +177,9 @@ const App: React.FC = () => {
         {/* 기본 리다이렉트 */}
         <Route path="/" element={<Navigate to="/matches" replace />} />
         <Route path="*" element={<Navigate to="/matches" replace />} />
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </>
   );
 };
 

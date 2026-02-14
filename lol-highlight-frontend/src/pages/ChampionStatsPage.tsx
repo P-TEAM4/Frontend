@@ -1,23 +1,7 @@
 // src/pages/ChampionStatsPage.tsx
 import React, { useState } from 'react';
 import ChampionImage from '../components/common/ChampionImage';
-
-interface ChampionGlobalStats {
-    championName: string;
-    championNameKr: string; // 한글 이름
-    tier: 'S' | 'A' | 'B' | 'C' | 'D';
-    pickRate: number;
-    banRate: number;
-    winRate: number;
-    avgKills: number;
-    avgDeaths: number;
-    avgAssists: number;
-    coreItems: number[];
-    situationalItems: number[];
-    primaryRune: string;
-    counters: string[]; // 상성 불리
-    goodAgainst: string[]; // 상성 유리
-}
+import type { ChampionGlobalStats } from '../types/champion';
 
 type RoleFilter = 'ALL' | 'TOP' | 'JUNGLE' | 'MID' | 'ADC' | 'SUPPORT';
 
