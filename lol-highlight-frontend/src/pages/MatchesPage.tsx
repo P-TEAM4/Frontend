@@ -20,8 +20,6 @@ const MatchesPage: React.FC = () => {
     const [activeSearch, setActiveSearch] = useState<{ gameName: string; tagLine: string } | null>(null);
 
     const [searchInput, setSearchInput] = useState('');
-    const [previousMatchCount, setPreviousMatchCount] = useState(0);
-    const [allMatchesLoaded, setAllMatchesLoaded] = useState(false);
     const [totalMatchesFetched, setTotalMatchesFetched] = useState(0);
 
     // URL params에서 자동 검색 실행
@@ -88,9 +86,6 @@ const MatchesPage: React.FC = () => {
         mutationFn: async () => {
             if (!activeSearch) return;
             
-            // 현재 전적 개수 저장
-            setPreviousMatchCount(totalMatchesFetched);
-            
             // startIndex로 현재 전적 개수 전달
             return loadMoreMatches(
                 activeSearch.gameName,
@@ -99,21 +94,20 @@ const MatchesPage: React.FC = () => {
             );
         },
         onSuccess: async () => {
+            // 현재 로드된 페이지 수 저장
+            const currentPageCount = data?.pages.length || 0;
+            
             // 쿼리 무효화하여 재조회
             await queryClient.invalidateQueries({
                 queryKey: ['matches', activeSearch?.gameName, activeSearch?.tagLine]
             });
             
-            // 잠시 후 전적 개수 확인
-            setTimeout(() => {
-                const currentData = queryClient.getQueryData(['matches', activeSearch?.gameName, activeSearch?.tagLine]) as any;
-                const newMatchCount = currentData?.pages.flatMap((p: any) => p.matches.content).length || 0;
-                
-                // 전적 개수가 그대로면 더 이상 없음
-                if (newMatchCount === previousMatchCount) {
-                    setAllMatchesLoaded(true);
+            // 잠시 기다린 후 이전에 로드했던 페이지까지 다시 로드
+            setTimeout(async () => {
+                for (let i = 1; i < currentPageCount; i++) {
+                    await fetchNextPage();
                 }
-            }, 500);
+            }, 300);
         },
     });
 
@@ -121,10 +115,6 @@ const MatchesPage: React.FC = () => {
         e.preventDefault();
         const input = searchInput.trim();
         if (!input) return;
-
-        // 새로운 검색 시 상태 리셋
-        setPreviousMatchCount(0);
-        setAllMatchesLoaded(false);
 
         const hashIndex = input.lastIndexOf('#');
         if (hashIndex === -1) {
@@ -398,11 +388,11 @@ const MatchesPage: React.FC = () => {
                         {!isLoading && allMatches.length > 0 && (
                             <div className="mt-6 flex flex-col items-center gap-2">
                                 {hasNextPage ? (
-                                    // DB에 다음 페이지가 있으면 일반 페이지네이션
+                                    // DB에 다음 페이지가 있으면 DB 페이지네이션
                                     <button
                                         onClick={() => fetchNextPage()}
                                         disabled={isFetchingNextPage}
-                                        className="px-8 py-3 bg-[#31313C] hover:bg-[#424254] text-white font-bold text-sm rounded-lg border border-[#424254] hover:border-[#0AC8B9] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                        className="px-8 py-3 bg-[#0AC8B9] hover:bg-[#0BD4C3] text-[#1C1C1F] font-bold text-sm rounded-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-lg shadow-[#0AC8B9]/30"
                                     >
                                         {isFetchingNextPage ? (
                                             <span className="flex items-center gap-2">
@@ -413,30 +403,15 @@ const MatchesPage: React.FC = () => {
                                                 불러오는 중...
                                             </span>
                                         ) : (
-                                            <span className="flex items-center gap-2">
-                                                더 보기
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                </svg>
-                                            </span>
+                                            '더보기'
                                         )}
                                     </button>
-                                ) : allMatchesLoaded ? (
-                                    // 모든 전적을 불러온 상태
-                                    <div className="px-8 py-3 text-[#9E9EB1] font-bold text-sm">
-                                        <span className="flex items-center gap-2">
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                            모든 전적을 불러왔습니다
-                                        </span>
-                                    </div>
                                 ) : (
-                                    // DB에 다음 페이지가 없으면 Riot API에서 추가로 가져오기 시도
+                                    // DB에 다음 페이지가 없으면 Riot API에서 추가로 가져오기
                                     <button
                                         onClick={() => loadMoreMutation.mutate()}
                                         disabled={loadMoreMutation.isPending}
-                                        className="px-8 py-3 bg-[#31313C] hover:bg-[#424254] text-white font-bold text-sm rounded-lg border border-[#424254] hover:border-[#0AC8B9] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                        className="px-8 py-3 bg-[#0AC8B9] hover:bg-[#0BD4C3] text-[#1C1C1F] font-bold text-sm rounded-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-lg shadow-[#0AC8B9]/30"
                                     >
                                         {loadMoreMutation.isPending ? (
                                             <span className="flex items-center gap-2">
@@ -444,18 +419,14 @@ const MatchesPage: React.FC = () => {
                                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                                 </svg>
-                                                Riot API에서 불러오는 중...
+                                                더 불러오는 중...
                                             </span>
                                         ) : (
-                                            <span className="flex items-center gap-2">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                                </svg>
-                                                추가 전적 불러오기
-                                            </span>
-                                        )}
+                                            '더보기'
+                                         )}
                                     </button>
                                 )}
+                                
                                 {/* 디버그 정보 */}
                                 <div className="text-xs text-[#515163]">
                                     표시된 전적: {allMatches.length}개 | 전체: {data?.pages[0]?.matches.totalElements || 0}개 | 페이지: {data?.pages.length || 0}
