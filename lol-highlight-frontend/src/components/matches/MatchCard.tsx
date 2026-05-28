@@ -1,6 +1,5 @@
-// src/components/matches/MatchCard.tsx
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import type { MatchResponse } from '../../types/api';
 import {
     formatRelativeTime,
@@ -16,6 +15,8 @@ interface MatchCardProps {
 
 const MatchCard: React.FC<MatchCardProps> = ({ match, hasHighlights = false }) => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const [failedItems, setFailedItems] = useState<Set<number>>(new Set());
 
     // 승패에 따른 스타일 정의
     const bgClass = match.win ? 'bg-[#28344E]' : 'bg-[#59343B]';
@@ -70,31 +71,41 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, hasHighlights = false }) =
 
             {/* 4. 아이템 (데이터 연동) */}
             <div className="flex-1 py-3 flex items-center pl-4 gap-1">
-                {[match.item0, match.item1, match.item2, match.item3, match.item4, match.item5].map((item, i) => (
-                    <div key={i} className={`w-6 h-6 rounded-sm ${match.win ? 'bg-[#2F436E]' : 'bg-[#703C47]'} overflow-hidden flex items-center justify-center`}>
+                {[match.item0, match.item1, match.item2, match.item3, match.item4, match.item5].map((item, i) =>
+                    item > 0 && !failedItems.has(i) ? (
+                        <div key={i} className={`w-6 h-6 rounded-sm ${match.win ? 'bg-[#2F436E]' : 'bg-[#703C47]'} overflow-hidden flex items-center justify-center`}>
+                            <ItemImage
+                                itemId={item}
+                                gameVersion={match.gameVersion}
+                                className="w-full h-full object-cover"
+                                alt={`Item ${item}`}
+                                onFail={() => setFailedItems(prev => new Set([...prev, i]))}
+                            />
+                        </div>
+                    ) : (
+                        <div key={i} className="w-6 h-6 rounded-sm bg-[#1a1a2e] opacity-40" />
+                    )
+                )}
+                {/* 장신구 (item6) */}
+                {match.item6 > 0 && !failedItems.has(6) ? (
+                    <div className={`w-6 h-6 rounded-full ml-1 ${match.win ? 'bg-[#2F436E]' : 'bg-[#703C47]'} overflow-hidden flex items-center justify-center`}>
                         <ItemImage
-                            itemId={item}
+                            itemId={match.item6}
                             gameVersion={match.gameVersion}
                             className="w-full h-full object-cover"
-                            alt={`Item ${item}`}
+                            alt={`Trinket ${match.item6}`}
+                            onFail={() => setFailedItems(prev => new Set([...prev, 6]))}
                         />
                     </div>
-                ))}
-                {/* 장신구 (item6) */}
-                <div className={`w-6 h-6 rounded-full ml-1 ${match.win ? 'bg-[#2F436E]' : 'bg-[#703C47]'} overflow-hidden flex items-center justify-center`}>
-                    <ItemImage
-                        itemId={match.item6}
-                        gameVersion={match.gameVersion}
-                        className="w-full h-full object-cover"
-                        alt={`Trinket ${match.item6}`}
-                    />
-                </div>
+                ) : (
+                    <div className="w-6 h-6 rounded-full ml-1 bg-[#1a1a2e] opacity-40" />
+                )}
             </div>
 
             {/* 5. 더보기 버튼영역 */}
             <div className={`w-10 flex flex-col justify-end items-center pb-2 pr-2 ${bgClass}`}>
                 <button
-                    onClick={() => navigate(`/match/${match.matchId}`)}
+                    onClick={() => navigate(`/match/${match.matchId}`, { state: { from: location.pathname + location.search } })}
                     className={`w-7 h-7 flex items-center justify-center rounded border border-transparent ${buttonClass} text-white transition-colors`}
                 >
                     <svg className="w-4 h-4 transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">

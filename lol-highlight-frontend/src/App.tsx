@@ -12,8 +12,10 @@ import MyHighlightsPage from './pages/MyHighlightsPage';
 import ChampionStatsPage from './pages/ChampionStatsPage';
 import SettingsPage from './pages/SettingsPage';
 import ChampionStatsOverlay from './components/overlay/ChampionStatsOverlay';
+import AdminPage from './pages/AdminPage';
 import { getCachedDataDragonVersion, getCachedVersionsList } from './api/datadragon';
 import { setDataDragonVersion, setDataDragonVersionsList } from './types/api';
+import { useGameRecorder } from './hooks/useGameRecorder';
 
 // 인증이 필요한 라우트를 보호하는 컴포넌트
 const ProtectedRoute: React.FC = () => {
@@ -63,6 +65,7 @@ const PublicLayout: React.FC = () => {
 const App: React.FC = () => {
   const { isAuthenticated, user, logout } = useAuthStore();
   const [selectedChampion, setSelectedChampion] = useState<string | null>(null);
+  useGameRecorder();
 
   React.useEffect(() => {
     // 토큰은 있는데 사용자 정보가 없는 경우 (로그인 과정 중 오류 발생 등)
@@ -107,10 +110,8 @@ const App: React.FC = () => {
           try {
             const { ipcRenderer } = (window as any).require('electron');
             await ipcRenderer.invoke('update-settings', settings);
-            console.log('Settings synced to Electron:', settings);
-          } catch (ipcError) {
-            // IPC 에러는 무시 (Electron 환경이 아니거나 아직 준비되지 않음)
-            console.warn('Electron IPC not ready:', ipcError);
+          } catch {
+            // Electron IPC 준비 전이거나 핸들러 미등록 — 무시
           }
         }
       } catch (error) {
@@ -172,6 +173,11 @@ const App: React.FC = () => {
             <Route path="/highlights" element={<MyHighlightsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
+        </Route>
+
+        {/* 관리자 */}
+        <Route element={<MainLayout />}>
+          <Route path="/admin" element={<AdminPage />} />
         </Route>
 
         {/* 기본 리다이렉트 */}

@@ -1,20 +1,22 @@
-// src/pages/MatchDetailPage.tsx
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { getMatchDetail } from '../api/matches';
-import { getMatchAnalysis, createAnalysis, regenerateAnalysis } from '../api/analyses';
 import { getMatchHighlights } from '../api/highlights';
-import { getChampionIconUrl, getItemIconUrl, formatGameDuration } from '../types/api';
+import { getChampionIconUrl, formatGameDuration } from '../types/api';
 import type { HighlightResponse } from '../types/api';
-import AnalysisCard from '../components/analysis/AnalysisCard';
+import ItemImage from '../components/common/ItemImage';
 import HighlightCard from '../components/highlights/HighlightCard';
 import HighlightModal from '../components/highlights/HighlightModal';
-import Button from '../components/common/Button';
 
 const MatchDetailPage: React.FC = () => {
     const { matchId } = useParams<{ matchId: string }>();
-    const queryClient = useQueryClient();
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    React.useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
     const [selectedHighlight, setSelectedHighlight] = useState<HighlightResponse | null>(null);
 
     // 매치 상세 정보 조회
@@ -24,39 +26,11 @@ const MatchDetailPage: React.FC = () => {
         enabled: !!matchId,
     });
 
-    // 분석 조회
-    const {
-        data: analysis,
-        isLoading: isLoadingAnalysis,
-        isError: isAnalysisError
-    } = useQuery({
-        queryKey: ['matchAnalysis', matchId],
-        queryFn: () => getMatchAnalysis(matchId || ''),
-        enabled: !!matchId,
-        retry: false,
-    });
-
     // 하이라이트 목록 조회
     const { data: highlightsData, isLoading: isLoadingHighlights } = useQuery({
         queryKey: ['matchHighlights', matchId],
         queryFn: () => getMatchHighlights(matchId || ''),
         enabled: !!matchId,
-    });
-
-    // 분석 생성 뮤테이션
-    const createAnalysisMutation = useMutation({
-        mutationFn: () => createAnalysis(matchId || ''),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['matchAnalysis', matchId] });
-        },
-    });
-
-    // 분석 재생성 뮤테이션
-    const regenerateAnalysisMutation = useMutation({
-        mutationFn: () => regenerateAnalysis(analysis!.id),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['matchAnalysis', matchId] });
-        },
     });
 
     if (isLoadingDetail) {
@@ -92,6 +66,15 @@ const MatchDetailPage: React.FC = () => {
         border border-[#1E3A5F]
       `}>
                 <div className="p-6">
+                    <button
+                        onClick={() => navigate((location.state as { from?: string })?.from || '/matches')}
+                        className="flex items-center gap-1 text-sm text-[#8B8B8B] hover:text-[#F0F0F0] transition-colors mb-4"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                        전적으로 돌아가기
+                    </button>
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-bold text-[#F0F0F0] mb-2">
@@ -167,14 +150,15 @@ const MatchDetailPage: React.FC = () => {
                                 <div className="flex gap-0.5">
                                     {player.finalItems.slice(0, 6).map((itemId, i) => (
                                         itemId > 0 ? (
-                                            <img
-                                                key={i}
-                                                src={getItemIconUrl(itemId)}
-                                                alt={`Item ${itemId}`}
-                                                className="w-6 h-6 rounded"
-                                            />
+                                            <div key={i} className="w-6 h-6 rounded bg-[#1E3A5F] overflow-hidden">
+                                                <ItemImage
+                                                    itemId={itemId}
+                                                    className="w-full h-full object-cover"
+                                                    alt={`Item ${itemId}`}
+                                                />
+                                            </div>
                                         ) : (
-                                            <div key={i} className="w-6 h-6 rounded bg-[#1E3A5F]" />
+                                            <div key={i} className="w-6 h-6 rounded bg-[#1E3A5F] opacity-40" />
                                         )
                                     ))}
                                 </div>
@@ -237,14 +221,15 @@ const MatchDetailPage: React.FC = () => {
                                 <div className="flex gap-0.5">
                                     {player.finalItems.slice(0, 6).map((itemId, i) => (
                                         itemId > 0 ? (
-                                            <img
-                                                key={i}
-                                                src={getItemIconUrl(itemId)}
-                                                alt={`Item ${itemId}`}
-                                                className="w-6 h-6 rounded"
-                                            />
+                                            <div key={i} className="w-6 h-6 rounded bg-[#1E3A5F] overflow-hidden">
+                                                <ItemImage
+                                                    itemId={itemId}
+                                                    className="w-full h-full object-cover"
+                                                    alt={`Item ${itemId}`}
+                                                />
+                                            </div>
                                         ) : (
-                                            <div key={i} className="w-6 h-6 rounded bg-[#1E3A5F]" />
+                                            <div key={i} className="w-6 h-6 rounded bg-[#1E3A5F] opacity-40" />
                                         )
                                     ))}
                                 </div>
@@ -252,24 +237,6 @@ const MatchDetailPage: React.FC = () => {
                         ))}
                     </div>
                 </div>
-            </div>
-
-            {/* AI 분석 */}
-            <div>
-                <div className="section-header">
-                    <svg className="w-5 h-5 text-[#C8AA6E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                    <h2 className="section-title">AI 경기 분석</h2>
-                </div>
-
-                <AnalysisCard
-                    analysis={isAnalysisError ? null : analysis}
-                    isLoading={isLoadingAnalysis}
-                    onCreateAnalysis={() => createAnalysisMutation.mutate()}
-                    onRegenerateAnalysis={analysis ? () => regenerateAnalysisMutation.mutate() : undefined}
-                    isCreating={createAnalysisMutation.isPending}
-                />
             </div>
 
             {/* 하이라이트 */}

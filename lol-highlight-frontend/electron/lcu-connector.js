@@ -214,6 +214,105 @@ class LCUConnector {
     }
 
     /**
+     * 현재 게임 플로우 페이즈 반환
+     * 가능한 값: None, Lobby, ChampSelect, InProgress, WaitingForStats, EndOfGame, PreEndOfGame
+     */
+    async getGamePhase() {
+        try {
+            const phase = await this.request('/lol-gameflow/v1/gameflow-phase');
+            return typeof phase === 'string' ? phase.replace(/"/g, '') : phase;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * 실제 게임이 시작됐는지 확인 (로딩화면 이후)
+     * Live Client Data API(포트 2999)가 응답하면 게임 라이브 상태
+     */
+    async isGameLive() {
+        return new Promise((resolve) => {
+            const req = https.request({
+                hostname: '127.0.0.1',
+                port: 2999,
+                path: '/liveclientdata/gamestats',
+                method: 'GET',
+                rejectUnauthorized: false,
+            }, (res) => {
+                resolve(res.statusCode === 200);
+            });
+            req.on('error', () => resolve(false));
+            req.setTimeout(1000, () => { req.destroy(); resolve(false); });
+            req.end();
+        });
+    }
+
+    /**
+     * 게임 라이브 상태에서 matchId 직접 획득
+     * Live Client Data API의 gameId + 지역 prefix 조합
+     */
+    async getLiveMatchId() {
+        return new Promise(async (resolve) => {
+            const req = https.request({
+                hostname: '127.0.0.1',
+                port: 2999,
+                path: '/liveclientdata/gamestats',
+                method: 'GET',
+                rejectUnauthorized: false,
+            }, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', async () => {
+                    try {
+                        const json = JSON.parse(data);
+                        if (json.gameId) {
+                            const region = await this.getRegion();
+                            resolve(`${region}_${json.gameId}`);
+                        } else {
+                            resolve(null);
+                        }
+                    } catch {
+                        resolve(null);
+                    }
+                });
+            });
+            req.on('error', () => resolve(null));
+            req.setTimeout(1000, () => { req.destroy(); resolve(null); });
+            req.end();
+        });
+    }
+
+    /**
+     * 게임 종료 후 matchId 획득
+     * LCU /lol-end-of-game/v1/eog-stats-block에서 gameId 추출 후 지역 prefix 조합
+     */
+    async getEndOfGameMatchId() {
+        try {
+            const region = await this.getRegion();
+            const eog = await this.request('/lol-end-of-game/v1/eog-stats-block');
+            if (eog && eog.gameId) {
+                return `${region}_${eog.gameId}`;
+            }
+            return null;
+        } catch (err) {
+            console.error('[LCU] Failed to get end-of-game matchId:', err.message);
+            return null;
+        }
+    }
+
+    /**
+     * 현재 계정의 지역 코드 반환 (예: KR, NA1, EUW1)
+     */
+    async getRegion() {
+        try {
+            const data = await this.request('/riotclient/region-locale');
+            return data?.region || 'KR';
+        } catch {
+            return 'KR';
+        }
+    }
+
+    /**
      * 연결 해제
      */
     disconnect() {

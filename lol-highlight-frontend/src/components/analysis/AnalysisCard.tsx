@@ -126,14 +126,14 @@ const AnalysisCard: React.FC<AnalysisCardProps> = ({
                                     className="text-2xl font-bold mb-1"
                                     style={{ color: item.color }}
                                 >
-                                    {item.score.toFixed(1)}
+                                    {item.score != null ? item.score.toFixed(1) : '-'}
                                 </div>
                                 <div className="text-xs text-[#8B8B8B]">{item.label}</div>
                                 <div className="mt-2 h-1.5 bg-[#1E3A5F] rounded-full overflow-hidden">
                                     <div
                                         className="h-full rounded-full transition-all duration-500"
                                         style={{
-                                            width: `${(item.score / 10) * 100}%`,
+                                            width: `${((item.score ?? 0) / 10) * 100}%`,
                                             backgroundColor: item.color
                                         }}
                                     />

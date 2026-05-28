@@ -10,8 +10,7 @@ export const getDataDragonVersion = async (): Promise<string> => {
         return response.data.version;
     } catch (error) {
         console.error('Failed to fetch Data Dragon version:', error);
-        // 폴백: 최신 알려진 버전
-        return '16.3.1';
+        return '16.11.1';
     }
 };
 
@@ -25,17 +24,16 @@ export const getAllDataDragonVersions = async (): Promise<string[]> => {
         return versions;
     } catch (error) {
         console.error('Failed to fetch Data Dragon versions:', error);
-        // 폴백: 최근 알려진 버전들
-        return ['16.3.1', '15.24.1', '14.23.1', '13.24.1'];
+        return ['16.11.1', '16.10.1', '16.9.1', '16.8.1', '15.24.1'];
     }
 };
 
 /**
  * Data Dragon 버전 캐싱 (1일 유효)
  */
-const VERSION_CACHE_KEY = 'datadragon_version';
-const VERSION_CACHE_EXPIRY_KEY = 'datadragon_version_expiry';
-const VERSIONS_LIST_CACHE_KEY = 'datadragon_versions_list';
+const VERSION_CACHE_KEY = 'datadragon_version_v2';
+const VERSION_CACHE_EXPIRY_KEY = 'datadragon_version_expiry_v2';
+const VERSIONS_LIST_CACHE_KEY = 'datadragon_versions_list_v2';
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24시간
 
 export const getCachedDataDragonVersion = async (): Promise<string> => {

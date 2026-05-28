@@ -151,6 +151,23 @@ const LoginPage: React.FC = () => {
         );
     }
 
+    const handleDevLogin = async () => {
+        try {
+            const res = await apiClient.post('/auth/test-token', null, { params: { email: 'test@nexus.gg' } });
+            const { accessToken, refreshToken } = res.data.data;
+
+            useAuthStore.getState().setTokens(accessToken, refreshToken);
+            apiClient.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+
+            const userData = await getCurrentUser();
+            setUser(userData);
+            navigate('/dashboard');
+        } catch (err) {
+            console.error('Dev login failed:', err);
+            alert('개발자 로그인 실패. Spring 서버가 실행 중인지 확인하세요.');
+        }
+    };
+
     const handleLogin = () => {
         // API_BASE_URL이 /api를 포함하지 않을 수 있으므로 체크 (client.ts는 /api를 붙이지만 여기는 Auth URL임)
         // 보통 API_BASE_URL은 'http://localhost:8080' 형태라고 가정
@@ -198,6 +215,14 @@ const LoginPage: React.FC = () => {
 
                     {/* Google 로그인 버튼 */}
                     <div className="flex justify-center flex-col items-center gap-4">
+                        {import.meta.env.DEV && (
+                            <button
+                                onClick={handleDevLogin}
+                                className="w-full py-3 rounded-lg bg-[#1E3A5F] text-[#00C8FF] font-medium hover:bg-[#2A4A70] transition-colors text-sm border border-[#00C8FF]/30"
+                            >
+                                [DEV] 개발자 로그인
+                            </button>
+                        )}
                         <Button
                             variant="secondary"
                             size="lg"

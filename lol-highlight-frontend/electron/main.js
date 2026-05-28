@@ -1,5 +1,6 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, desktopCapturer } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { exec } = require('child_process');
 const lcuConnector = require('./lcu-connector');
 
@@ -8,13 +9,18 @@ let tray = null;
 let isQuitting = false;
 let lolMonitorInterval = null;
 let championCheckInterval = null;
-let lastNotifiedChampion = null; // 중복 알림 방지
+let lastNotifiedChampion = null;
 
-// 설정 (메모리에만 저장, 백엔드에서 동기화)
+// 게임 상태 머신: NONE → LOADING → IN_GAME → ENDED
+let gameState = 'NONE';
+let gamePhaseInterval = null;
+let liveGamePollInterval = null;
+let currentMatchId = null;
+
 let appSettings = {
     autoLaunch: false,
     autoShowOnLol: true,
-    showChampionStats: true, // 인게임 챔피언 통계 자동 표시
+    showChampionStats: true,
 };
 
 function createWindow() {
@@ -28,18 +34,16 @@ function createWindow() {
         backgroundColor: '#050816',
         autoHideMenuBar: true,
         icon: path.join(__dirname, '../public/favicon.ico'),
-        show: false, // 시작 시 숨김 (트레이로 시작)
+        show: false,
     });
 
     const startUrl = process.env.ELECTRON_START_URL || 'http://localhost:5173';
     mainWindow.loadURL(startUrl);
 
-    // 윈도우가 준비되면 표시
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
     });
 
-    // 윈도우 닫기 버튼 클릭 시 트레이로 최소화
     mainWindow.on('close', (event) => {
         if (!isQuitting) {
             event.preventDefault();
@@ -54,22 +58,18 @@ function createWindow() {
 }
 
 function createTray() {
-    // 트레이 아이콘 생성 (간단한 텍스트 아이콘)
     const icon = nativeImage.createFromDataURL(
         'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAA7AAAAOwBeShxvQAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAFMSURBVFiF7ZaxSgNBEIa/vSwWFhYWFhY+gI+Qh7CwsLGwsLCwsLGwsLCwsLGwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCw+D/YJJfkLsldkrskd0nuktwluUtyl+QuyV2SuyR3Se6S3CW5S3KX5C7JXZK7JHdJ7pLcJblLcpfkLsldkrskd0nuktwluUtyl+QuyV2SuyR3Se6S3CW5S3KX5C7JXZK7JHdJ7pLcJblLcpfkLsldkrskd0nuktwluUtyl+QuyV2SuyR3Se6S3CW5S3KX5C7JXZK7JHdJ7pLcJblLcpfkLsldkrskd0nuktwluUtyl+QuyV2SuyR3Se6S3CW5S3KX5C7JXZK7JHdJ7pLcJblLcpfkLsldkrskd0nuktwluUtyl+QuyV2SuyR3Se6S3CW5S3KX5C7JXZK7JPcF9wBxT0rMqKsAAAAASUVORK5CYII='
     );
 
     tray = new Tray(icon);
-    
+
     const contextMenu = Menu.buildFromTemplate([
         {
             label: '열기',
             click: () => {
-                if (mainWindow) {
-                    mainWindow.show();
-                } else {
-                    createWindow();
-                }
+                if (mainWindow) mainWindow.show();
+                else createWindow();
             }
         },
         {
@@ -77,125 +77,72 @@ function createTray() {
             type: 'checkbox',
             checked: app.getLoginItemSettings().openAtLogin,
             click: (menuItem) => {
-                app.setLoginItemSettings({
-                    openAtLogin: menuItem.checked,
-                    openAsHidden: true, // 백그라운드로 시작
-                });
+                app.setLoginItemSettings({ openAtLogin: menuItem.checked, openAsHidden: true });
             }
         },
         { type: 'separator' },
         {
             label: '종료',
-            click: () => {
-                isQuitting = true;
-                app.quit();
-            }
+            click: () => { isQuitting = true; app.quit(); }
         }
     ]);
 
     tray.setToolTip('LOL Highlight');
     tray.setContextMenu(contextMenu);
-
-    // 트레이 아이콘 더블클릭으로 윈도우 표시
     tray.on('double-click', () => {
-        if (mainWindow) {
-            mainWindow.show();
-        } else {
-            createWindow();
-        }
+        if (mainWindow) mainWindow.show();
+        else createWindow();
     });
 }
 
-// 롤 런처 프로세스 감지
+// ─── 롤 클라이언트 감지 ───────────────────────────────────────
+
 async function checkLeagueClient() {
-    // 설정에서 자동 표시가 비활성화된 경우 체크하지 않음
-    if (!appSettings.autoShowOnLol) {
-        console.log('[LOL Monitor] Auto-show disabled, skipping check');
-        return;
-    }
+    if (!appSettings.autoShowOnLol) return;
 
-    // 롤 런처 감지 (League of Legends.app)
-    const processName = process.platform === 'win32' 
-        ? 'LeagueClient.exe' 
-        : 'League of Legends';
-
+    const processName = process.platform === 'win32' ? 'LeagueClient.exe' : 'League of Legends';
     const command = process.platform === 'win32'
         ? `tasklist /FI "IMAGENAME eq ${processName}" /NH`
-        : `pgrep -f "League of Legends"`;  // 런처 프로세스 감지
+        : `pgrep -f "League of Legends"`;
 
-    console.log(`[LOL Monitor] Checking for process: ${processName}`);
-    console.log(`[LOL Monitor] Command: ${command}`);
-
-    exec(command, async (error, stdout, stderr) => {
-        console.log(`[LOL Monitor] Error: ${error}`);
-        console.log(`[LOL Monitor] Stdout: ${stdout}`);
-        console.log(`[LOL Monitor] Stderr: ${stderr}`);
-
+    exec(command, async (error, stdout) => {
         if (!error && stdout && stdout.trim().length > 0) {
-            // 롤 런처 실행 중 - 메인 윈도우 표시
-            console.log('[LOL Monitor] League of Legends detected!');
-            if (mainWindow && !mainWindow.isVisible()) {
-                console.log('[LOL Monitor] Showing window...');
-                mainWindow.show();
-            } else if (!mainWindow) {
-                console.log('[LOL Monitor] Creating window...');
-                createWindow();
-            } else {
-                console.log('[LOL Monitor] Window already visible');
-            }
+            if (mainWindow && !mainWindow.isVisible()) mainWindow.show();
+            else if (!mainWindow) createWindow();
 
-            // LCU 연결 시도 및 챔피언 모니터링 시작
             const connected = await lcuConnector.connect();
-            if (connected && appSettings.showChampionStats) {
-                startChampionMonitoring();
+            if (connected) {
+                if (appSettings.showChampionStats) startChampionMonitoring();
+                startGamePhaseMonitoring();
             }
         } else {
-            console.log('[LOL Monitor] League of Legends not detected');
-            // 롤이 종료되면 챔피언 모니터링도 중지
             stopChampionMonitoring();
+            stopGamePhaseMonitoring();
         }
     });
 }
 
-// 롤 클라이언트 모니터링 시작
 function startLeagueMonitoring() {
-    // 5초마다 체크
     lolMonitorInterval = setInterval(checkLeagueClient, 5000);
-    // 즉시 한 번 체크
     checkLeagueClient();
 }
 
-// 롤 클라이언트 모니터링 중지
 function stopLeagueMonitoring() {
-    if (lolMonitorInterval) {
-        clearInterval(lolMonitorInterval);
-        lolMonitorInterval = null;
-    }
+    if (lolMonitorInterval) { clearInterval(lolMonitorInterval); lolMonitorInterval = null; }
     stopChampionMonitoring();
+    stopGamePhaseMonitoring();
 }
 
-// 챔피언 선택 감지
-async function monitorChampionSelect() {
-    // 설정에서 비활성화된 경우 체크하지 않음
-    if (!appSettings.showChampionStats) {
-        return;
-    }
+// ─── 챔피언 선택 모니터링 ────────────────────────────────────
 
+async function monitorChampionSelect() {
+    if (!appSettings.showChampionStats) return;
     try {
         const champion = await lcuConnector.getCurrentChampion();
-        
         if (champion && champion !== lastNotifiedChampion) {
-            console.log('[Champion Monitor] Champion selected:', champion);
-            
-            // 프론트엔드로 챔피언 정보 전송
-            if (mainWindow && mainWindow.webContents) {
-                mainWindow.webContents.send('champion-selected', champion);
-            }
-            
+            mainWindow?.webContents.send('champion-selected', champion);
             lastNotifiedChampion = champion;
         } else if (!champion && lastNotifiedChampion) {
-            // 챔피언 선택이 취소됨
-            console.log('[Champion Monitor] Champion selection cleared');
             lastNotifiedChampion = null;
         }
     } catch (err) {
@@ -203,19 +150,15 @@ async function monitorChampionSelect() {
     }
 }
 
-// 챔피언 모니터링 시작
 function startChampionMonitoring() {
     if (!championCheckInterval) {
-        console.log('[Champion Monitor] Starting champion monitoring...');
-        championCheckInterval = setInterval(monitorChampionSelect, 2000); // 2초마다 체크
-        monitorChampionSelect(); // 즉시 한 번 실행
+        championCheckInterval = setInterval(monitorChampionSelect, 2000);
+        monitorChampionSelect();
     }
 }
 
-// 챔피언 모니터링 중지
 function stopChampionMonitoring() {
     if (championCheckInterval) {
-        console.log('[Champion Monitor] Stopping champion monitoring...');
         clearInterval(championCheckInterval);
         championCheckInterval = null;
         lastNotifiedChampion = null;
@@ -223,43 +166,125 @@ function stopChampionMonitoring() {
     }
 }
 
+// ─── 게임 페이즈 모니터링 ────────────────────────────────────
+
+async function checkGamePhase() {
+    try {
+        const phase = await lcuConnector.getGamePhase();
+        if (!phase) return;
+
+        console.log(`[Game Monitor] Phase: ${phase}, State: ${gameState}`);
+
+        if (phase === 'InProgress' && gameState === 'NONE') {
+            // 로딩화면 시작 → Live Client 폴링 시작
+            gameState = 'LOADING';
+            console.log('[Game Monitor] Loading screen detected, waiting for game live...');
+            startLiveGamePolling();
+
+        } else if (['WaitingForStats', 'EndOfGame', 'PreEndOfGame'].includes(phase)
+                && (gameState === 'LOADING' || gameState === 'IN_GAME')) {
+            // 게임 종료
+            console.log('[Game Monitor] Game ended');
+            stopLiveGamePolling();
+            gameState = 'ENDED';
+
+            // 게임 시작 시 저장한 matchId 우선 사용, 없으면 EOG에서 획득
+            const matchId = currentMatchId || await lcuConnector.getEndOfGameMatchId();
+            console.log('[Game Monitor] Match ID:', matchId);
+            mainWindow?.webContents.send('game-ended', { matchId });
+
+            // 30초 후 상태 초기화
+            setTimeout(() => { gameState = 'NONE'; currentMatchId = null; }, 30000);
+
+        } else if (['None', 'Lobby'].includes(phase) && gameState !== 'NONE') {
+            stopLiveGamePolling();
+            gameState = 'NONE';
+        }
+    } catch (err) {
+        console.error('[Game Monitor] Error:', err.message);
+    }
+}
+
+function startGamePhaseMonitoring() {
+    if (!gamePhaseInterval) {
+        console.log('[Game Monitor] Starting game phase monitoring...');
+        gamePhaseInterval = setInterval(checkGamePhase, 3000);
+        checkGamePhase();
+    }
+}
+
+function stopGamePhaseMonitoring() {
+    if (gamePhaseInterval) {
+        clearInterval(gamePhaseInterval);
+        gamePhaseInterval = null;
+    }
+    stopLiveGamePolling();
+    gameState = 'NONE';
+}
+
+// ─── 실제 게임 시작 감지 (로딩화면 → 인게임) ─────────────────
+
+function startLiveGamePolling() {
+    if (liveGamePollInterval) return;
+    liveGamePollInterval = setInterval(async () => {
+        if (gameState !== 'LOADING') {
+            stopLiveGamePolling();
+            return;
+        }
+        const matchId = await lcuConnector.getLiveMatchId();
+        if (matchId) {
+            console.log('[Game Monitor] Game is now LIVE — matchId:', matchId);
+            currentMatchId = matchId;
+            gameState = 'IN_GAME';
+            stopLiveGamePolling();
+            mainWindow?.webContents.send('game-started', { matchId });
+        }
+    }, 2000);
+}
+
+function stopLiveGamePolling() {
+    if (liveGamePollInterval) {
+        clearInterval(liveGamePollInterval);
+        liveGamePollInterval = null;
+    }
+}
+
+// ─── 앱 초기화 ────────────────────────────────────────────────
+
 app.whenReady().then(() => {
+    setupIpcHandlers();
     createWindow();
     createTray();
     startLeagueMonitoring();
-    
-    // IPC 핸들러 등록
-    setupIpcHandlers();
 
     app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
-            createWindow();
-        }
+        if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });
 });
 
-// IPC 핸들러 설정
 function setupIpcHandlers() {
-    // 설정 조회
-    ipcMain.handle('get-settings', () => {
-        return appSettings;
+    ipcMain.handle('get-settings', () => appSettings);
+
+    ipcMain.handle('update-settings', (event, settings) => {
+        appSettings = { ...appSettings, ...settings };
+        app.setLoginItemSettings({ openAtLogin: appSettings.autoLaunch, openAsHidden: true });
+        return true;
     });
 
-    // 설정 업데이트
-    ipcMain.handle('update-settings', (event, settings) => {
-        console.log('Updating settings:', settings);
-        
-        // 설정 업데이트
-        appSettings = { ...appSettings, ...settings };
-        
-        // 자동 시작 설정 적용
-        app.setLoginItemSettings({
-            openAtLogin: appSettings.autoLaunch,
-            openAsHidden: true, // 백그라운드로 시작
-        });
-        
-        console.log('Settings updated:', appSettings);
-        return true;
+    ipcMain.handle('get-screen-sources', async () => {
+        const sources = await desktopCapturer.getSources({ types: ['screen'] });
+        return sources.map(s => ({ id: s.id, name: s.name }));
+    });
+
+    ipcMain.handle('save-video', (event, { buffer, filename }) => {
+        const recordingsDir = path.join(app.getPath('documents'), 'LOL-Recordings');
+        if (!fs.existsSync(recordingsDir)) {
+            fs.mkdirSync(recordingsDir, { recursive: true });
+        }
+        const filePath = path.join(recordingsDir, filename);
+        fs.writeFileSync(filePath, Buffer.from(buffer));
+        console.log('[Recorder] Video saved to:', filePath);
+        return filePath;
     });
 }
 
@@ -269,7 +294,5 @@ app.on('before-quit', () => {
 });
 
 app.on('window-all-closed', () => {
-    // macOS에서는 트레이 앱으로 계속 실행
-    // Windows에서도 트레이로 계속 실행
-    // 앱을 완전히 종료하려면 트레이 메뉴에서 "종료" 클릭
+    // 트레이로 계속 실행 (종료는 트레이 메뉴에서)
 });

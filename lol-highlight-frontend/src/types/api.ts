@@ -212,8 +212,8 @@ export type ErrorCode =
     | 'EXTERNAL_API_ERROR';
 
 // Data Dragon 버전 (서버에서 동적으로 가져옴)
-let DDRAGON_VERSION = '16.3.1'; // 폴백 기본값
-let DDRAGON_VERSIONS_LIST: string[] = ['16.3.1', '15.24.1', '14.23.1', '13.24.1']; // 폴백 이전 버전 목록
+let DDRAGON_VERSION = '16.11.1'; // 폴백 기본값
+let DDRAGON_VERSIONS_LIST: string[] = ['16.11.1', '16.10.1', '16.9.1', '16.8.1', '15.24.1']; // 폴백 이전 버전 목록
 
 // Data Dragon 버전 설정 (초기화 시 호출)
 export const setDataDragonVersion = (version: string) => {

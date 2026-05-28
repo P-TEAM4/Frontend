@@ -71,6 +71,29 @@ export const incrementViewCount = async (id: number): Promise<HighlightResponse>
     return response.data.data;
 };
 
+// 하이라이트 생성 (영상 업로드)
+export const createHighlight = async (matchId: string, video: File): Promise<HighlightResponse> => {
+    const formData = new FormData();
+    formData.append('video', video);
+    const requestBlob = new Blob(
+        [JSON.stringify({ matchId, title: `${matchId} 하이라이트` })],
+        { type: 'application/json' }
+    );
+    formData.append('request', requestBlob);
+
+    const response = await apiClient.post<ApiResponse<HighlightResponse>>(
+        '/highlights',
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0 }
+    );
+
+    if (!response.data.data) {
+        throw new Error('하이라이트 생성에 실패했습니다.');
+    }
+
+    return response.data.data;
+};
+
 // AI 자동 하이라이트 생성
 export const autoGenerateHighlights = async (matchId: string): Promise<void> => {
     await apiClient.post(`/highlights/match/${matchId}/auto-generate`);

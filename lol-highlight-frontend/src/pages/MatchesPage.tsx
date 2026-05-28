@@ -15,7 +15,7 @@ const MatchesPage: React.FC = () => {
     const navigate = useNavigate();
     const { isAuthenticated, user } = useAuthStore();
     const queryClient = useQueryClient();
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
 
     const [activeSearch, setActiveSearch] = useState<{ gameName: string; tagLine: string } | null>(null);
 
@@ -119,11 +119,13 @@ const MatchesPage: React.FC = () => {
         const hashIndex = input.lastIndexOf('#');
         if (hashIndex === -1) {
             setActiveSearch({ gameName: input, tagLine: 'KR1' });
+            setSearchParams({ gameName: input, tagLine: 'KR1' });
         } else {
             const gameName = input.substring(0, hashIndex).trim();
             const tagLine = input.substring(hashIndex + 1).trim();
             if (gameName && tagLine) {
                 setActiveSearch({ gameName, tagLine });
+                setSearchParams({ gameName, tagLine });
             }
         }
     }, [searchInput]);
@@ -206,7 +208,10 @@ const MatchesPage: React.FC = () => {
                         {/* 연동된 계정으로 빠른 검색 */}
                         {user?.summonerName && (
                             <button
-                                onClick={() => setActiveSearch({ gameName: user.summonerName!, tagLine: user.tagLine || 'KR1' })}
+                                onClick={() => {
+                    setActiveSearch({ gameName: user.summonerName!, tagLine: user.tagLine || 'KR1' });
+                    setSearchParams({ gameName: user.summonerName!, tagLine: user.tagLine || 'KR1' });
+                }}
                                 className="mt-8 flex items-center gap-3 bg-[#31313C] hover:bg-[#424254] border border-[#424254] rounded-lg px-5 py-3 transition-colors animate-fade-in-up"
                                 style={{ animationDelay: '0.2s' }}
                             >

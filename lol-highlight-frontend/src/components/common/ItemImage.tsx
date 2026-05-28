@@ -1,12 +1,13 @@
 // src/components/common/ItemImage.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { getDataDragonVersion, getDataDragonVersionsList } from '../../types/api';
 
 interface ItemImageProps {
     itemId: number | null;
-    gameVersion?: string | null; // 경기의 패치 버전
+    gameVersion?: string | null;
     className?: string;
     alt?: string;
+    onFail?: () => void;
 }
 
 // 삭제되었거나 존재하지 않는 아이템 ID 목록
@@ -25,39 +26,41 @@ const convertToDataDragonVersion = (gameVersion: string): string => {
 
 // 이미지 소스 우선순위
 const getItemImageSources = (itemId: number, gameVersion?: string | null): string[] => {
-    const sources: string[] = [];
+    const currentVersion = getDataDragonVersion();
+    const allVersions = getDataDragonVersionsList();
 
-    // 1. 경기의 패치 버전 우선 (gameVersion이 있으면)
+    const sources: string[] = [
+        // 1. 최신 알려진 DataDragon 버전 (가장 신뢰도 높음)
+        `https://ddragon.leagueoflegends.com/cdn/${currentVersion}/img/item/${itemId}.png`,
+    ];
+
+    // 2. 게임 패치 버전 (allVersions에 없으면 건너뜀)
     if (gameVersion) {
         const ddVersion = convertToDataDragonVersion(gameVersion);
-        sources.push(`https://ddragon.leagueoflegends.com/cdn/${ddVersion}/img/item/${itemId}.png`);
+        if (ddVersion !== currentVersion && allVersions.includes(ddVersion)) {
+            sources.push(`https://ddragon.leagueoflegends.com/cdn/${ddVersion}/img/item/${itemId}.png`);
+        }
     }
 
-    // 2. 최신 버전 Data Dragon
-    const currentVersion = getDataDragonVersion();
-    sources.push(`https://ddragon.leagueoflegends.com/cdn/${currentVersion}/img/item/${itemId}.png`);
-
-    // 3. 이전 버전들 (동적으로 가져온 버전 목록에서 1~4번째 사용)
-    const allVersions = getDataDragonVersionsList();
-    const previousVersions = allVersions.slice(1, 5); // 최신 제외, 다음 4개 버전
-    previousVersions.forEach(version => {
+    // 3. 이전 버전들
+    allVersions.slice(1, 4).forEach(version => {
         sources.push(`https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemId}.png`);
     });
 
-    // 4. Community Dragon (최신 버전)
-    sources.push(`https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/${itemId.toString().toLowerCase()}.png`);
-
-    // 5. Community Dragon (PBE)
-    sources.push(`https://raw.communitydragon.org/pbe/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/${itemId.toString().toLowerCase()}.png`);
+    // 4. Community Dragon
+    sources.push(`https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/assets/items/icons2d/${itemId}.png`);
 
     return sources;
 };
 
-const ItemImage: React.FC<ItemImageProps> = ({ itemId, gameVersion, className = '', alt = `Item ${itemId}` }) => {
+const ItemImage: React.FC<ItemImageProps> = ({ itemId, gameVersion, className = '', alt = `Item ${itemId}`, onFail }) => {
     const [currentSourceIndex, setCurrentSourceIndex] = useState(0);
     const [hasError, setHasError] = useState(false);
 
-    // 아이템 ID가 0이거나 유효하지 않으면 렌더링하지 않음
+    useEffect(() => {
+        if (hasError) onFail?.();
+    }, [hasError]); // eslint-disable-line react-hooks/exhaustive-deps
+
     if (!itemId || itemId === 0) {
         return null;
     }
@@ -66,18 +69,14 @@ const ItemImage: React.FC<ItemImageProps> = ({ itemId, gameVersion, className = 
     const currentSrc = sources[currentSourceIndex];
 
     const handleError = () => {
-        // 다음 소스가 있으면 시도
         if (currentSourceIndex < sources.length - 1) {
-            console.log(`[ItemImage] Failed to load item ${itemId} from source ${currentSourceIndex}, trying next...`);
             setCurrentSourceIndex(prev => prev + 1);
         } else {
-            // 모든 소스 실패 - 에러 상태 설정
             console.warn(`[ItemImage] All sources failed for item ${itemId}`);
             setHasError(true);
         }
     };
 
-    // 모든 소스에서 실패한 경우 플레이스홀더 표시하지 않고 숨김
     if (hasError) {
         return null;
     }
