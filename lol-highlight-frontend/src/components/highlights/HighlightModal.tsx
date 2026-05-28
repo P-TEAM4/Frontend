@@ -1,53 +1,76 @@
 // src/components/highlights/HighlightModal.tsx
 import React, { useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { HighlightResponse } from '../../types/api';
 import { incrementViewCount } from '../../api/highlights';
+import { getMatchAnalysis } from '../../api/analyses';
 
 interface HighlightModalProps {
     highlight: HighlightResponse;
     onClose: () => void;
 }
 
+const ScoreBar: React.FC<{ label: string; value: number | null }> = ({ label, value }) => {
+    const pct = value != null ? Math.round(Math.min(Math.max(value, 0), 100)) : 0;
+    const color = pct >= 70 ? '#6BCF7F' : pct >= 40 ? '#FFD93D' : '#E84057';
+    return (
+        <div>
+            <div className="flex justify-between text-xs mb-1">
+                <span className="text-[#8B8B8B]">{label}</span>
+                <span style={{ color }} className="font-semibold">{value != null ? value.toFixed(1) : '-'}</span>
+            </div>
+            <div className="h-1.5 bg-[#1E3A5F] rounded-full overflow-hidden">
+                <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${pct}%`, backgroundColor: color }}
+                />
+            </div>
+        </div>
+    );
+};
+
 const HighlightModal: React.FC<HighlightModalProps> = ({ highlight, onClose }) => {
     const modalRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
 
-    // 모달 열릴 때 조회수 증가
+    const { data: analysis } = useQuery({
+        queryKey: ['matchAnalysis', highlight.matchId],
+        queryFn: () => getMatchAnalysis(highlight.matchId),
+        retry: false,
+        staleTime: 1000 * 60 * 5,
+    });
+
     useEffect(() => {
         incrementViewCount(highlight.id).catch(console.error);
     }, [highlight.id]);
 
-    // ESC 키로 닫기
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                onClose();
-            }
+            if (e.key === 'Escape') onClose();
         };
-
         document.addEventListener('keydown', handleKeyDown);
         document.body.style.overflow = 'hidden';
-
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
             document.body.style.overflow = 'unset';
         };
     }, [onClose]);
 
-    // 외부 클릭으로 닫기
     const handleBackdropClick = (e: React.MouseEvent) => {
-        if (e.target === modalRef.current) {
-            onClose();
-        }
+        if (e.target === modalRef.current) onClose();
     };
+
+    const hasAnalysis = analysis?.status === 'COMPLETED' && (
+        analysis.strengthAnalysis || analysis.weaknessAnalysis || analysis.improvementSuggestions || analysis.scores
+    );
 
     return (
         <div
             ref={modalRef}
             onClick={handleBackdropClick}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn overflow-y-auto py-4"
         >
-            <div className="relative w-full max-w-4xl mx-4 bg-[#0D1B2A] rounded-xl border border-[#1E3A5F] shadow-[0_0_50px_rgba(0,200,255,0.2)] animate-scaleIn">
+            <div className="relative w-full max-w-2xl mx-4 bg-[#0D1B2A] rounded-xl border border-[#1E3A5F] shadow-[0_0_50px_rgba(0,200,255,0.2)] animate-scaleIn">
                 {/* 헤더 */}
                 <div className="flex items-center justify-between p-4 border-b border-[#1E3A5F]">
                     <div>
@@ -112,6 +135,52 @@ const HighlightModal: React.FC<HighlightModalProps> = ({ highlight, onClose }) =
                         게임 내 시간: {Math.floor(highlight.startTime / 60)}:{(highlight.startTime % 60).toString().padStart(2, '0')} - {Math.floor(highlight.endTime / 60)}:{(highlight.endTime % 60).toString().padStart(2, '0')}
                     </div>
                 </div>
+
+                {/* 경기 분석 섹션 */}
+                {hasAnalysis && (
+                    <div className="p-4 border-t border-[#1E3A5F] space-y-4">
+                        <h3 className="text-sm font-bold text-[#C8AA6E] flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            경기 분석
+                        </h3>
+
+                        {/* 점수 */}
+                        {analysis!.scores && (
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                                <ScoreBar label="영향력" value={analysis!.scores.impactScore} />
+                                <ScoreBar label="팀파이트" value={analysis!.scores.teamFightScore} />
+                                <ScoreBar label="파밍" value={analysis!.scores.farmingScore} />
+                                <ScoreBar label="시야" value={analysis!.scores.visionScore} />
+                                <ScoreBar label="오브젝트" value={analysis!.scores.objectiveControlScore} />
+                                <ScoreBar label="종합" value={analysis!.scores.averageScore} />
+                            </div>
+                        )}
+
+                        {/* 텍스트 분석 */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                            {analysis!.strengthAnalysis && (
+                                <div className="bg-[#112240] rounded-lg p-3 border border-[#6BCF7F]/30">
+                                    <div className="text-[#6BCF7F] font-semibold mb-1">강점</div>
+                                    <p className="text-[#A0A0A0] leading-relaxed">{analysis!.strengthAnalysis}</p>
+                                </div>
+                            )}
+                            {analysis!.weaknessAnalysis && (
+                                <div className="bg-[#112240] rounded-lg p-3 border border-[#E84057]/30">
+                                    <div className="text-[#E84057] font-semibold mb-1">약점</div>
+                                    <p className="text-[#A0A0A0] leading-relaxed">{analysis!.weaknessAnalysis}</p>
+                                </div>
+                            )}
+                            {analysis!.improvementSuggestions && (
+                                <div className="bg-[#112240] rounded-lg p-3 border border-[#C8AA6E]/30">
+                                    <div className="text-[#C8AA6E] font-semibold mb-1">개선점</div>
+                                    <p className="text-[#A0A0A0] leading-relaxed">{analysis!.improvementSuggestions}</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
 
             <style>{`

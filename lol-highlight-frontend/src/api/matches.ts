@@ -101,6 +101,31 @@ export interface SummonerProfileResponse {
     recentStats: RecentStats | null;  // 최근 20경기 통계
 }
 
+export interface ChampionStat {
+    championName: string;
+    totalGames: number;
+    winRate: number;
+    pickRate: number;
+    banRate: number;
+    avgKills: number;
+    avgDeaths: number;
+    avgAssists: number;
+    tier: 'S' | 'A' | 'B' | 'C' | 'D';
+}
+
+export interface ChampionStatsResponse {
+    champions: ChampionStat[];
+    totalMatches: number;
+}
+
+export const getChampionStats = async (position?: string): Promise<ChampionStatsResponse> => {
+    const response = await apiClient.get<ApiResponse<ChampionStatsResponse>>('/matches/champion-stats', {
+        params: position ? { position } : {},
+    });
+    if (!response.data.data) throw new Error('챔피언 통계를 불러올 수 없습니다.');
+    return response.data.data;
+};
+
 // 소환사 프로필 정보 조회 (티어, 레벨 등)
 export const getSummonerInfo = async (gameName: string, tagLine: string): Promise<SummonerProfileResponse> => {
     const response = await apiClient.get<ApiResponse<SummonerProfileResponse>>(
