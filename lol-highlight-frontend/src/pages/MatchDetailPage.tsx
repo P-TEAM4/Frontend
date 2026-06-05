@@ -2,34 +2,82 @@ import React, { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getMatchDetail } from '../api/matches';
-import { getMatchHighlights } from '../api/highlights';
-import { getChampionIconUrl, formatGameDuration } from '../types/api';
-import type { HighlightResponse } from '../types/api';
+import { getChampionIconUrl, getItemIconUrl, formatGameDuration } from '../types/api';
+import type { PlayerDetail } from '../types/api';
 import ItemImage from '../components/common/ItemImage';
-import HighlightCard from '../components/highlights/HighlightCard';
-import HighlightModal from '../components/highlights/HighlightModal';
+
+const SKILL_LABEL: Record<number, string> = { 1: 'Q', 2: 'W', 3: 'E', 4: 'R' };
+const SKILL_COLOR: Record<number, string> = {
+    1: 'bg-[#28A0F0] text-white',
+    2: 'bg-[#6BCF7F] text-[#0D1B2A]',
+    3: 'bg-[#FFD93D] text-[#0D1B2A]',
+    4: 'bg-[#E84057] text-white',
+};
+
+const PlayerBuildDetail: React.FC<{ player: PlayerDetail }> = ({ player }) => {
+    const itemBuilds = [...(player.itemBuild ?? [])].sort((a, b) => a.timestamp - b.timestamp);
+    const skillBuild = player.skillBuild ?? [];
+
+    return (
+        <div className="px-4 pb-4 bg-[#0a1628] border-t border-[#1E3A5F] space-y-4">
+            {/* 아이템 트리 */}
+            {itemBuilds.length > 0 && (
+                <div>
+                    <p className="text-xs text-[#8B8B8B] font-semibold mt-3 mb-2">아이템 구매 순서</p>
+                    <div className="flex flex-wrap gap-2 items-center">
+                        {itemBuilds.map((ib, i) => (
+                            <div key={i} className="flex flex-col items-center gap-0.5">
+                                <div className="w-8 h-8 rounded bg-[#1E3A5F] overflow-hidden">
+                                    <img
+                                        src={getItemIconUrl(ib.itemId)}
+                                        alt={`item ${ib.itemId}`}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                    />
+                                </div>
+                                <span className="text-[10px] text-[#5B5B5B]">
+                                    {String(Math.floor(ib.timestamp / 60000)).padStart(2, '0')}:{String(Math.floor((ib.timestamp % 60000) / 1000)).padStart(2, '0')}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* 스킬 트리 */}
+            {skillBuild.length > 0 && (
+                <div>
+                    <p className="text-xs text-[#8B8B8B] font-semibold mb-2">스킬 레벨업 순서</p>
+                    <div className="flex flex-wrap gap-1">
+                        {skillBuild.map((skill, i) => (
+                            <div key={i} className="flex flex-col items-center gap-0.5">
+                                <span className={`w-6 h-6 flex items-center justify-center rounded text-xs font-bold ${SKILL_COLOR[skill] ?? 'bg-[#1E3A5F] text-[#8B8B8B]'}`}>
+                                    {SKILL_LABEL[skill] ?? '?'}
+                                </span>
+                                <span className="text-[10px] text-[#5B5B5B]">{i + 1}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const MatchDetailPage: React.FC = () => {
     const { matchId } = useParams<{ matchId: string }>();
     const navigate = useNavigate();
     const location = useLocation();
 
+    const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
+
     React.useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
-    const [selectedHighlight, setSelectedHighlight] = useState<HighlightResponse | null>(null);
-
     // 매치 상세 정보 조회
     const { data: matchDetail, isLoading: isLoadingDetail } = useQuery({
         queryKey: ['matchDetail', matchId],
         queryFn: () => getMatchDetail(matchId || ''),
-        enabled: !!matchId,
-    });
-
-    // 하이라이트 목록 조회
-    const { data: highlightsData, isLoading: isLoadingHighlights } = useQuery({
-        queryKey: ['matchHighlights', matchId],
-        queryFn: () => getMatchHighlights(matchId || ''),
         enabled: !!matchId,
     });
 
@@ -118,52 +166,52 @@ const MatchDetailPage: React.FC = () => {
                         </div>
                     </div>
                     <div className="bg-[#0D1B2A]">
-                        {bluePlayers.map((player, idx) => (
-                            <div
-                                key={idx}
-                                className="flex items-center gap-3 px-4 py-3 border-b border-[#1E3A5F] last:border-b-0 hover:bg-[#112240] transition-colors"
-                            >
-                                <img
-                                    src={getChampionIconUrl(player.championName)}
-                                    alt={player.championName}
-                                    className="w-10 h-10 rounded-full border border-[#1E3A5F]"
-                                />
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-[#F0F0F0] truncate">
-                                        {player.playerName}
-                                    </p>
-                                    <p className="text-xs text-[#8B8B8B]">{player.championName}</p>
+                        {bluePlayers.map((player, idx) => {
+                            const key = `blue-${idx}`;
+                            const isExpanded = expandedPlayer === key;
+                            return (
+                                <div key={idx} className="border-b border-[#1E3A5F] last:border-b-0">
+                                    <div
+                                        onClick={() => setExpandedPlayer(isExpanded ? null : key)}
+                                        className="flex items-center gap-3 px-4 py-3 hover:bg-[#112240] transition-colors cursor-pointer"
+                                    >
+                                        <img src={getChampionIconUrl(player.championName)} alt={player.championName} className="w-10 h-10 rounded-full border border-[#1E3A5F]" />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-[#F0F0F0] truncate">{player.playerName}</p>
+                                            <p className="text-xs text-[#8B8B8B]">{player.championName}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-semibold">
+                                                <span className="text-[#F0F0F0]">{player.kills}</span>
+                                                <span className="text-[#5B5B5B]">/</span>
+                                                <span className="text-[#E84057]">{player.deaths}</span>
+                                                <span className="text-[#5B5B5B]">/</span>
+                                                <span className="text-[#00C8FF]">{player.assists}</span>
+                                            </p>
+                                        </div>
+                                        <div className="text-right text-xs text-[#8B8B8B] w-16">
+                                            <p>{player.cs} CS</p>
+                                            <p>{player.goldEarned.toLocaleString()} G</p>
+                                        </div>
+                                        <div className="flex gap-0.5">
+                                            {player.finalItems.slice(0, 6).map((itemId, i) => (
+                                                itemId > 0 ? (
+                                                    <div key={i} className="w-6 h-6 rounded bg-[#1E3A5F] overflow-hidden">
+                                                        <ItemImage itemId={itemId} className="w-full h-full object-cover" alt={`Item ${itemId}`} />
+                                                    </div>
+                                                ) : (
+                                                    <div key={i} className="w-6 h-6 rounded bg-[#1E3A5F] opacity-40" />
+                                                )
+                                            ))}
+                                        </div>
+                                        <svg className={`w-4 h-4 text-[#5B5B5B] transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                    {isExpanded && <PlayerBuildDetail player={player} />}
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-sm font-semibold">
-                                        <span className="text-[#F0F0F0]">{player.kills}</span>
-                                        <span className="text-[#5B5B5B]">/</span>
-                                        <span className="text-[#E84057]">{player.deaths}</span>
-                                        <span className="text-[#5B5B5B]">/</span>
-                                        <span className="text-[#00C8FF]">{player.assists}</span>
-                                    </p>
-                                </div>
-                                <div className="text-right text-xs text-[#8B8B8B] w-16">
-                                    <p>{player.cs} CS</p>
-                                    <p>{player.goldEarned.toLocaleString()} G</p>
-                                </div>
-                                <div className="flex gap-0.5">
-                                    {player.finalItems.slice(0, 6).map((itemId, i) => (
-                                        itemId > 0 ? (
-                                            <div key={i} className="w-6 h-6 rounded bg-[#1E3A5F] overflow-hidden">
-                                                <ItemImage
-                                                    itemId={itemId}
-                                                    className="w-full h-full object-cover"
-                                                    alt={`Item ${itemId}`}
-                                                />
-                                            </div>
-                                        ) : (
-                                            <div key={i} className="w-6 h-6 rounded bg-[#1E3A5F] opacity-40" />
-                                        )
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -189,103 +237,56 @@ const MatchDetailPage: React.FC = () => {
                         </div>
                     </div>
                     <div className="bg-[#0D1B2A]">
-                        {redPlayers.map((player, idx) => (
-                            <div
-                                key={idx}
-                                className="flex items-center gap-3 px-4 py-3 border-b border-[#1E3A5F] last:border-b-0 hover:bg-[#112240] transition-colors"
-                            >
-                                <img
-                                    src={getChampionIconUrl(player.championName)}
-                                    alt={player.championName}
-                                    className="w-10 h-10 rounded-full border border-[#1E3A5F]"
-                                />
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-[#F0F0F0] truncate">
-                                        {player.playerName}
-                                    </p>
-                                    <p className="text-xs text-[#8B8B8B]">{player.championName}</p>
+                        {redPlayers.map((player, idx) => {
+                            const key = `red-${idx}`;
+                            const isExpanded = expandedPlayer === key;
+                            return (
+                                <div key={idx} className="border-b border-[#1E3A5F] last:border-b-0">
+                                    <div
+                                        onClick={() => setExpandedPlayer(isExpanded ? null : key)}
+                                        className="flex items-center gap-3 px-4 py-3 hover:bg-[#112240] transition-colors cursor-pointer"
+                                    >
+                                        <img src={getChampionIconUrl(player.championName)} alt={player.championName} className="w-10 h-10 rounded-full border border-[#1E3A5F]" />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium text-[#F0F0F0] truncate">{player.playerName}</p>
+                                            <p className="text-xs text-[#8B8B8B]">{player.championName}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-semibold">
+                                                <span className="text-[#F0F0F0]">{player.kills}</span>
+                                                <span className="text-[#5B5B5B]">/</span>
+                                                <span className="text-[#E84057]">{player.deaths}</span>
+                                                <span className="text-[#5B5B5B]">/</span>
+                                                <span className="text-[#00C8FF]">{player.assists}</span>
+                                            </p>
+                                        </div>
+                                        <div className="text-right text-xs text-[#8B8B8B] w-16">
+                                            <p>{player.cs} CS</p>
+                                            <p>{player.goldEarned.toLocaleString()} G</p>
+                                        </div>
+                                        <div className="flex gap-0.5">
+                                            {player.finalItems.slice(0, 6).map((itemId, i) => (
+                                                itemId > 0 ? (
+                                                    <div key={i} className="w-6 h-6 rounded bg-[#1E3A5F] overflow-hidden">
+                                                        <ItemImage itemId={itemId} className="w-full h-full object-cover" alt={`Item ${itemId}`} />
+                                                    </div>
+                                                ) : (
+                                                    <div key={i} className="w-6 h-6 rounded bg-[#1E3A5F] opacity-40" />
+                                                )
+                                            ))}
+                                        </div>
+                                        <svg className={`w-4 h-4 text-[#5B5B5B] transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </div>
+                                    {isExpanded && <PlayerBuildDetail player={player} />}
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-sm font-semibold">
-                                        <span className="text-[#F0F0F0]">{player.kills}</span>
-                                        <span className="text-[#5B5B5B]">/</span>
-                                        <span className="text-[#E84057]">{player.deaths}</span>
-                                        <span className="text-[#5B5B5B]">/</span>
-                                        <span className="text-[#00C8FF]">{player.assists}</span>
-                                    </p>
-                                </div>
-                                <div className="text-right text-xs text-[#8B8B8B] w-16">
-                                    <p>{player.cs} CS</p>
-                                    <p>{player.goldEarned.toLocaleString()} G</p>
-                                </div>
-                                <div className="flex gap-0.5">
-                                    {player.finalItems.slice(0, 6).map((itemId, i) => (
-                                        itemId > 0 ? (
-                                            <div key={i} className="w-6 h-6 rounded bg-[#1E3A5F] overflow-hidden">
-                                                <ItemImage
-                                                    itemId={itemId}
-                                                    className="w-full h-full object-cover"
-                                                    alt={`Item ${itemId}`}
-                                                />
-                                            </div>
-                                        ) : (
-                                            <div key={i} className="w-6 h-6 rounded bg-[#1E3A5F] opacity-40" />
-                                        )
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             </div>
 
-            {/* 하이라이트 */}
-            <div>
-                <div className="section-header">
-                    <svg className="w-5 h-5 text-[#00C8FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                    <h2 className="section-title">하이라이트</h2>
-                </div>
-
-                {isLoadingHighlights ? (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {[...Array(4)].map((_, i) => (
-                            <div key={i} className="aspect-video bg-[#0D1B2A] rounded-lg animate-pulse" />
-                        ))}
-                    </div>
-                ) : highlightsData?.content.length === 0 ? (
-                    <div className="text-center py-12 bg-[#0D1B2A] rounded-xl border border-[#1E3A5F]">
-                        <svg className="w-16 h-16 mx-auto mb-4 text-[#1E3A5F]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                        <h3 className="text-lg font-semibold text-[#F0F0F0] mb-2">
-                            하이라이트가 없습니다
-                        </h3>
-                        <p className="text-sm text-[#8B8B8B]">
-                            이 경기의 하이라이트가 아직 등록되지 않았습니다.
-                        </p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {highlightsData?.content.map((highlight) => (
-                            <HighlightCard
-                                key={highlight.id}
-                                highlight={highlight}
-                                onClick={() => setSelectedHighlight(highlight)}
-                            />
-                        ))}
-                    </div>
-                )}
-            </div>
-
-            {/* 하이라이트 모달 */}
-            {selectedHighlight && (
-                <HighlightModal
-                    highlight={selectedHighlight}
-                    onClose={() => setSelectedHighlight(null)}
-                />
-            )}
         </div>
     );
 };

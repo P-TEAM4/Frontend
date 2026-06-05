@@ -137,6 +137,23 @@ export interface ScoreData {
     averageScore: number;
 }
 
+export interface AiModelData {
+    champion: string;
+    role: string;
+    win: boolean;
+    summary: string;
+    baselineProba: number;
+    predictedProba: number;
+    overallScore: number;
+    topFeatures: Array<{
+        name: string;
+        displayName: string;
+        direction: string;
+        shap: number;
+        value: number;
+    }>;
+}
+
 export interface AnalysisResponse {
     id: number;
     matchId: number;
@@ -146,6 +163,7 @@ export interface AnalysisResponse {
     scores: ScoreData | null;
     status: AnalysisStatus;
     createdAt: string;
+    aiModelData: string | null;
 }
 
 export interface CreateAnalysisRequest {
@@ -155,6 +173,21 @@ export interface CreateAnalysisRequest {
 // 하이라이트 관련 타입
 export type HighlightType = 'PENTAKILL' | 'BARON' | 'DRAGON' | 'TOWER' | 'OTHER';
 export type HighlightStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
+export interface ClipEventData {
+    baseImportance: number | null;
+    impactScore: number | null;
+    combinedImportance: number | null;
+    eventType: string | null;
+    details: {
+        victim_id?: number;
+        killer_id?: number;
+        assistants?: number[];
+        bounty?: number;
+        shutdown_bounty?: number;
+        object_type?: string;
+    } | null;
+}
 
 export interface HighlightResponse {
     id: number;
@@ -170,6 +203,7 @@ export interface HighlightResponse {
     status: HighlightStatus;
     viewCount: number;
     createdAt: string;
+    eventData: string | null;
 }
 
 export interface CreateHighlightRequest {

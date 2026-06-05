@@ -5,9 +5,19 @@ import { getPlayerHighlights } from '../api/highlights';
 import { getMatchAnalysis } from '../api/analyses';
 import { linkRiot, unlinkRiot } from '../api/users';
 import { useUser, useAuthStore } from '../store/authStore';
-import type { HighlightResponse, HighlightType, AnalysisResponse } from '../types/api';
+import type { HighlightResponse, HighlightType, AnalysisResponse, AiModelData, ClipEventData } from '../types/api';
 import { formatRelativeTime } from '../types/api';
 import Button from '../components/common/Button';
+
+function parseAiModelData(raw: string | null): AiModelData | null {
+    if (!raw) return null;
+    try { return JSON.parse(raw) as AiModelData; } catch { return null; }
+}
+
+function parseEventData(raw: string | null): ClipEventData | null {
+    if (!raw) return null;
+    try { return JSON.parse(raw) as ClipEventData; } catch { return null; }
+}
 
 const AI_BASE_URL = 'http://localhost:8000';
 
@@ -26,27 +36,38 @@ interface MatchGroup {
 }
 
 // ── 클립 모달 ────────────────────────────────────────────────────────────────
+const EVENT_TYPE_KO: Record<string, string> = {
+    kill: '킬', death: '죽음', objective: '오브젝트',
+    CHAMPION_KILL: '킬', BUILDING_KILL: '건물 파괴', ELITE_MONSTER_KILL: '오브젝트',
+};
+
 const ClipModal: React.FC<{ clip: HighlightResponse; onClose: () => void }> = ({ clip, onClose }) => {
     const videoUrl = resolveVideoUrl(clip.videoUrl);
     const isMistake = clip.title.startsWith('[실수]');
+    const label = clip.title
+        .replace(/^\[(하이라이트|실수)\]\s*/, '')
+        .replace(/\s*\(\d+\.?\d*분\)/g, '')
+        .trim();
+    const ev = parseEventData(clip.eventData);
+
+    const gameTime = `${Math.floor(clip.startTime / 60)}:${(clip.startTime % 60).toString().padStart(2, '0')}`;
+    const assistCount = ev?.details?.assistants?.length ?? 0;
+    const bounty = ev?.details?.bounty ?? 0;
+    const shutdownBounty = ev?.details?.shutdown_bounty ?? 0;
+    const combinedScore = ev?.combinedImportance ?? ev?.baseImportance ?? null;
 
     return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-            onClick={onClose}
-        >
-            <div
-                className="relative w-full max-w-2xl mx-4 bg-[#0D1B2A] rounded-xl border border-[#1E3A5F] shadow-[0_0_50px_rgba(0,200,255,0.2)]"
-                onClick={(e) => e.stopPropagation()}
-            >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
+            <div className="relative w-full max-w-2xl mx-4 bg-[#0D1B2A] rounded-xl border border-[#1E3A5F] shadow-[0_0_50px_rgba(0,200,255,0.2)]" onClick={(e) => e.stopPropagation()}>
+
+                {/* 헤더 */}
                 <div className="flex items-center justify-between p-4 border-b border-[#1E3A5F]">
-                    <div>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded mr-2 ${isMistake ? 'bg-[#E84057]/20 text-[#E84057]' : 'bg-[#00C8FF]/20 text-[#00C8FF]'}`}>
+                    <div className="flex items-center gap-2">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded ${isMistake ? 'bg-[#E84057]/20 text-[#E84057]' : 'bg-[#00C8FF]/20 text-[#00C8FF]'}`}>
                             {isMistake ? '실수' : '하이라이트'}
                         </span>
-                        <span className="text-base font-bold text-[#F0F0F0]">
-                            {clip.title.replace(/^\[(하이라이트|실수)\]\s*/, '')}
-                        </span>
+                        <span className="text-base font-bold text-[#F0F0F0]">{label}</span>
+                        <span className="text-xs text-[#5B5B5B]">게임 내 {gameTime}</span>
                     </div>
                     <button onClick={onClose} className="p-2 rounded-lg text-[#8B8B8B] hover:text-[#F0F0F0] hover:bg-[#1E3A5F] transition-colors">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -55,28 +76,63 @@ const ClipModal: React.FC<{ clip: HighlightResponse; onClose: () => void }> = ({
                     </button>
                 </div>
 
+                {/* 비디오 */}
                 <div className="relative aspect-video bg-black">
                     {videoUrl ? (
                         <video src={videoUrl} controls autoPlay className="w-full h-full" />
                     ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center text-[#8B8B8B]">
                             <svg className="w-16 h-16 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                             </svg>
                             <p>비디오를 불러올 수 없습니다</p>
                         </div>
                     )}
                 </div>
 
-                {clip.description && (
-                    <div className="p-4 border-t border-[#1E3A5F]">
-                        <p className="text-sm text-[#A0A0A0]">{clip.description}</p>
-                    </div>
-                )}
+                {/* 상세 정보 */}
+                <div className="p-4 border-t border-[#1E3A5F] space-y-3">
+                    {/* 승률 영향 */}
+                    {clip.description && (
+                        <p className={`text-sm font-medium ${isMistake ? 'text-[#E84057]' : 'text-[#6BCF7F]'}`}>
+                            {clip.description}
+                        </p>
+                    )}
 
-                <div className="px-4 pb-4 pt-2 flex items-center gap-4 text-xs text-[#5B5B5B]">
-                    <span>게임 내 {Math.floor(clip.startTime / 60)}:{(clip.startTime % 60).toString().padStart(2, '0')}</span>
-                    {clip.duration > 0 && <span>길이 {clip.duration}초</span>}
+                    {/* 클립 세부 태그 */}
+                    {ev && (
+                        <div className="flex flex-wrap gap-2">
+                            {ev.eventType && (
+                                <span className="text-xs px-2 py-1 rounded bg-[#1E3A5F] text-[#8B8B8B]">
+                                    {EVENT_TYPE_KO[ev.eventType] ?? ev.eventType}
+                                </span>
+                            )}
+                            {assistCount > 0 && (
+                                <span className="text-xs px-2 py-1 rounded bg-[#1E3A5F] text-[#C8AA6E]">
+                                    어시스트 {assistCount}명 참여
+                                </span>
+                            )}
+                            {bounty > 0 && (
+                                <span className="text-xs px-2 py-1 rounded bg-[#C8AA6E]/20 text-[#C8AA6E]">
+                                    바운티 +{bounty.toLocaleString()}G
+                                </span>
+                            )}
+                            {shutdownBounty > 0 && (
+                                <span className="text-xs px-2 py-1 rounded bg-[#FFD93D]/20 text-[#FFD93D]">
+                                    연살 저지 +{shutdownBounty.toLocaleString()}G
+                                </span>
+                            )}
+                            {combinedScore != null && (
+                                <span className="text-xs px-2 py-1 rounded bg-[#00C8FF]/10 text-[#00C8FF]">
+                                    중요도 {combinedScore.toFixed(1)}점
+                                </span>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="text-xs text-[#5B5B5B]">
+                        클립 길이 {clip.duration > 0 ? `${clip.duration}초` : '약 15초'}
+                    </div>
                 </div>
             </div>
         </div>
@@ -104,7 +160,10 @@ const ScoreBar: React.FC<{ label: string; value: number | null }> = ({ label, va
 const ClipSlide: React.FC<{ clip: HighlightResponse; onClick: () => void }> = ({ clip, onClick }) => {
     const isMistake = clip.title.startsWith('[실수]');
     const videoUrl = resolveVideoUrl(clip.videoUrl);
-    const label = clip.title.replace(/^\[(하이라이트|실수)\]\s*/, '');
+    const label = clip.title
+        .replace(/^\[(하이라이트|실수)\]\s*/, '')
+        .replace(/\s*\(\d+\.?\d*분\)/g, '')
+        .trim();
 
     return (
         <div
@@ -197,6 +256,48 @@ const HorizontalClipSection: React.FC<{
     );
 };
 
+const ROLE_KO: Record<string, string> = {
+    TOP: '탑', JUNGLE: '정글', MIDDLE: '미드', MID: '미드',
+    BOTTOM: '원딜', UTILITY: '서포터', SUPPORT: '서포터', UNKNOWN: '알 수 없음',
+};
+
+const WinProbaBar: React.FC<{ baseline: number; predicted: number }> = ({ baseline, predicted }) => {
+    const basePct = Math.round(baseline * 100);
+    const predPct = Math.round(predicted * 100);
+    const diffPct = predPct - basePct;
+    const isPositive = diffPct >= 0;
+    const color = isPositive ? '#6BCF7F' : '#E84057';
+    const barStart = Math.min(basePct, predPct);
+    const barEnd = Math.max(basePct, predPct);
+
+    return (
+        <div>
+            <div className="flex justify-between text-xs mb-1">
+                <span className="text-[#8B8B8B]">승리 기여도</span>
+                <span style={{ color }} className="font-semibold">
+                    {isPositive ? '+' : ''}{diffPct}%
+                    <span className="text-[#5B5B5B] font-normal ml-1">(예측 승률 {predPct}%)</span>
+                </span>
+            </div>
+            <div className="h-2 bg-[#1E3A5F] rounded-full relative">
+                {/* 기여도 변화 구간: left/right 퍼센트로 고정 → overflow 영향 없음 */}
+                <div
+                    className="absolute top-0 bottom-0 transition-all duration-500"
+                    style={{ left: `${barStart}%`, right: `${100 - barEnd}%`, backgroundColor: color }}
+                />
+                {/* 기준선 마커 */}
+                <div
+                    className="absolute top-0 bottom-0 w-0.5 bg-white/70 z-10"
+                    style={{ left: `${basePct}%` }}
+                />
+            </div>
+            <div className="text-xs mt-0.5 text-[#5B5B5B]">
+                기준 승률 {basePct}%
+            </div>
+        </div>
+    );
+};
+
 // ── 경기 분석 섹션 ────────────────────────────────────────────────────────────
 const MatchAnalysisSection: React.FC<{ matchId: string }> = ({ matchId }) => {
     const { data: analysis, isLoading } = useQuery<AnalysisResponse>({
@@ -220,48 +321,129 @@ const MatchAnalysisSection: React.FC<{ matchId: string }> = ({ matchId }) => {
     if (!analysis || analysis.status !== 'COMPLETED') return null;
 
     const { scores, strengthAnalysis, weaknessAnalysis, improvementSuggestions } = analysis;
-    if (!scores && !strengthAnalysis && !weaknessAnalysis && !improvementSuggestions) return null;
+    const ai = parseAiModelData(analysis.aiModelData);
+
+    const strengths = strengthAnalysis ? strengthAnalysis.split(' | ').filter(Boolean) : [];
+    const weaknesses = weaknessAnalysis ? weaknessAnalysis.split(' | ').filter(Boolean) : [];
+    const improvements = improvementSuggestions ? improvementSuggestions.split(' | ').filter(Boolean) : [];
 
     return (
-        <div className="bg-[#0D1B2A] rounded-xl border border-[#1E3A5F] p-6 mb-6">
-            <h3 className="text-sm font-bold text-[#C8AA6E] flex items-center gap-2 mb-4">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                경기 분석
-            </h3>
+        <div className="bg-[#0D1B2A] rounded-xl border border-[#1E3A5F] p-6 mb-6 space-y-5">
+            {/* 헤더: 챔피언 + 역할 + 승패 */}
+            <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-[#C8AA6E] flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    경기 분석
+                </h3>
+                {ai && (
+                    <div className="flex items-center gap-3">
+                        {ai.champion && (
+                            <div className="flex items-center gap-2">
+                                <img
+                                    src={`https://ddragon.leagueoflegends.com/cdn/15.10.1/img/champion/${ai.champion}.png`}
+                                    alt={ai.champion}
+                                    className="w-8 h-8 rounded-full border border-[#1E3A5F]"
+                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                />
+                                <div>
+                                    <p className="text-sm font-semibold text-[#F0F0F0]">{ai.champion}</p>
+                                    {ai.role && <p className="text-xs text-[#8B8B8B]">{ROLE_KO[ai.role.toUpperCase()] ?? ai.role}</p>}
+                                </div>
+                            </div>
+                        )}
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${ai.win ? 'bg-[#28A0F0]/20 text-[#28A0F0]' : 'bg-[#E84057]/20 text-[#E84057]'}`}>
+                            {ai.win ? '승리' : '패배'}
+                        </span>
+                    </div>
+                )}
+            </div>
 
+            {/* AI 요약 */}
+            {ai?.summary && (
+                <p className="text-sm text-[#A0A0A0] bg-[#112240] rounded-lg px-4 py-3 border-l-2 border-[#C8AA6E]">
+                    {ai.summary}
+                </p>
+            )}
+
+            {/* 승리 기여도 */}
+            {ai && ai.baselineProba > 0 && ai.predictedProba > 0 && (
+                <WinProbaBar baseline={ai.baselineProba} predicted={ai.predictedProba} />
+            )}
+
+            {/* 점수 바 */}
             {scores && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3 mb-4">
-                    <ScoreBar label="영향력" value={scores.impactScore} />
-                    <ScoreBar label="팀파이트" value={scores.teamFightScore} />
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3">
+                    <ScoreBar label="영향력 (ML)" value={scores.impactScore} />
+                    <ScoreBar label="딜 기여도" value={scores.teamFightScore} />
                     <ScoreBar label="파밍" value={scores.farmingScore} />
                     <ScoreBar label="시야" value={scores.visionScore} />
-                    <ScoreBar label="오브젝트" value={scores.objectiveControlScore} />
+                    <ScoreBar label="골드 효율" value={scores.objectiveControlScore} />
                     <ScoreBar label="종합" value={scores.averageScore} />
                 </div>
             )}
 
+            {/* 강점 / 약점 / 개선점 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                {strengthAnalysis && (
+                {strengths.length > 0 && (
                     <div className="bg-[#112240] rounded-lg p-3 border border-[#6BCF7F]/30">
-                        <div className="text-[#6BCF7F] font-semibold mb-1">강점</div>
-                        <p className="text-[#A0A0A0] leading-relaxed">{strengthAnalysis}</p>
+                        <div className="text-[#6BCF7F] font-semibold mb-2">강점</div>
+                        <ul className="space-y-1">
+                            {strengths.map((s, i) => (
+                                <li key={i} className="text-[#A0A0A0] flex items-start gap-1">
+                                    <span className="text-[#6BCF7F] mt-0.5">•</span>{s}
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                 )}
-                {weaknessAnalysis && (
+                {weaknesses.length > 0 && (
                     <div className="bg-[#112240] rounded-lg p-3 border border-[#E84057]/30">
-                        <div className="text-[#E84057] font-semibold mb-1">약점</div>
-                        <p className="text-[#A0A0A0] leading-relaxed">{weaknessAnalysis}</p>
+                        <div className="text-[#E84057] font-semibold mb-2">약점</div>
+                        <ul className="space-y-1">
+                            {weaknesses.map((w, i) => (
+                                <li key={i} className="text-[#A0A0A0] flex items-start gap-1">
+                                    <span className="text-[#E84057] mt-0.5">•</span>{w}
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                 )}
-                {improvementSuggestions && (
+                {improvements.length > 0 && (
                     <div className="bg-[#112240] rounded-lg p-3 border border-[#C8AA6E]/30">
-                        <div className="text-[#C8AA6E] font-semibold mb-1">개선점</div>
-                        <p className="text-[#A0A0A0] leading-relaxed">{improvementSuggestions}</p>
+                        <div className="text-[#C8AA6E] font-semibold mb-2">개선점</div>
+                        <ul className="space-y-1">
+                            {improvements.map((imp, i) => (
+                                <li key={i} className="text-[#A0A0A0] flex items-start gap-1">
+                                    <span className="text-[#C8AA6E] mt-0.5">•</span>{imp}
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                 )}
             </div>
+
+            {/* 주요 기여 지표 (Top Features) */}
+            {ai?.topFeatures && ai.topFeatures.length > 0 && (
+                <div>
+                    <p className="text-xs text-[#8B8B8B] font-semibold mb-2">주요 영향 지표</p>
+                    <div className="flex flex-wrap gap-2">
+                        {ai.topFeatures.slice(0, 5).map((f, i) => (
+                            <span
+                                key={i}
+                                className={`text-xs px-2 py-1 rounded-full border ${
+                                    f.direction === 'positive'
+                                        ? 'border-[#6BCF7F]/40 text-[#6BCF7F] bg-[#6BCF7F]/10'
+                                        : 'border-[#E84057]/40 text-[#E84057] bg-[#E84057]/10'
+                                }`}
+                            >
+                                {f.direction === 'positive' ? '▲' : '▼'} {f.displayName}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -273,8 +455,11 @@ const MatchDetailView: React.FC<{
 }> = ({ group, onBack }) => {
     const [selectedClip, setSelectedClip] = useState<HighlightResponse | null>(null);
 
-    const highlightClips = group.highlights.filter((h) => !h.title.startsWith('[실수]'));
-    const mistakeClips = group.highlights.filter((h) => h.title.startsWith('[실수]'));
+    const validClips = group.highlights.filter(
+        (h) => h.title.startsWith('[하이라이트]') || h.title.startsWith('[실수]')
+    );
+    const highlightClips = validClips.filter((h) => !h.title.startsWith('[실수]'));
+    const mistakeClips = validClips.filter((h) => h.title.startsWith('[실수]'));
 
     return (
         <div>
