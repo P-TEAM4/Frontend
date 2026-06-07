@@ -204,6 +204,7 @@ export interface HighlightResponse {
     viewCount: number;
     createdAt: string;
     eventData: string | null;
+    coaching: string | null;
 }
 
 export interface CreateHighlightRequest {

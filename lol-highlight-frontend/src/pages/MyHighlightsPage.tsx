@@ -99,6 +99,14 @@ const ClipModal: React.FC<{ clip: HighlightResponse; onClose: () => void }> = ({
                         </p>
                     )}
 
+                    {/* AI 코칭 */}
+                    {clip.coaching && (
+                        <div className="bg-[#112240] rounded-lg px-4 py-3 border-l-2 border-[#C8AA6E]">
+                            <p className="text-xs text-[#C8AA6E] font-semibold mb-1">AI 코칭</p>
+                            <p className="text-sm text-[#A0A0A0] leading-relaxed">{clip.coaching}</p>
+                        </div>
+                    )}
+
                     {/* 클립 세부 태그 */}
                     {ev && (
                         <div className="flex flex-wrap gap-2">
