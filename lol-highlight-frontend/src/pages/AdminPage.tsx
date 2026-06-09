@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { createHighlight, getHighlight } from '../api/highlights';
+import { createHighlight, getHighlight, getMatchHighlights } from '../api/highlights';
 import { createAnalysis, getAnalysis } from '../api/analyses';
 
 type Status = 'idle' | 'loading' | 'polling' | 'success' | 'error';
 
-const POLL_INTERVAL = 3000;
-const MAX_POLLS = 40;
+const POLL_INTERVAL = 5000;
+const MAX_POLLS = 120;
 
 const AdminPage: React.FC = () => {
     const [matchId, setMatchId] = useState('');
@@ -53,7 +53,7 @@ const AdminPage: React.FC = () => {
         setTimeout(poll, POLL_INTERVAL);
     }, []);
 
-    const pollHighlightStatus = useCallback((highlightId: number) => {
+    const pollHighlightStatus = useCallback((highlightId: number, targetMatchId: string) => {
         stopPolling();
         pollCountRef.current = 0;
 
@@ -62,8 +62,23 @@ const AdminPage: React.FC = () => {
             try {
                 const updated = await getHighlight(highlightId);
                 if (updated.status === 'COMPLETED') {
-                    setHighlightStatus('success');
-                    setHighlightResult(JSON.stringify(updated, null, 2));
+                    // placeholder가 완료됐으므로 실제 클립 목록을 fetch
+                    try {
+                        const clipsPage = await getMatchHighlights(targetMatchId, 0, 50);
+                        const realClips = clipsPage.content.filter(
+                            (h) => h.title.startsWith('[하이라이트]') || h.title.startsWith('[실수]')
+                        );
+                        if (realClips.length > 0) {
+                            setHighlightStatus('success');
+                            setHighlightResult(JSON.stringify(realClips, null, 2));
+                        } else {
+                            setHighlightStatus('success');
+                            setHighlightResult(JSON.stringify(updated, null, 2));
+                        }
+                    } catch {
+                        setHighlightStatus('success');
+                        setHighlightResult(JSON.stringify(updated, null, 2));
+                    }
                 } else if (updated.status === 'FAILED') {
                     setHighlightStatus('error');
                     setHighlightResult(JSON.stringify(updated, null, 2));
@@ -108,7 +123,7 @@ const AdminPage: React.FC = () => {
                 if (res.status === 'PENDING' || res.status === 'PROCESSING') {
                     setHighlightStatus('polling');
                     setHighlightResult(JSON.stringify(res, null, 2));
-                    pollHighlightStatus(res.id);
+                    pollHighlightStatus(res.id, matchId.trim());
                 } else if (res.status === 'COMPLETED') {
                     setHighlightStatus('success');
                     setHighlightResult(JSON.stringify(res, null, 2));
@@ -222,7 +237,7 @@ const AdminPage: React.FC = () => {
                         {statusBadge(highlightStatus)}
                         {highlightStatus === 'polling' && (
                             <span className="text-xs text-[#5B5B5B]">
-                                AI 처리 중... ({pollCountRef.current * 3}초 경과)
+                                AI 처리 중... ({pollCountRef.current * 5}초 경과)
                             </span>
                         )}
                     </div>

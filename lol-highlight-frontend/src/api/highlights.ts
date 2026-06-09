@@ -72,11 +72,11 @@ export const incrementViewCount = async (id: number): Promise<HighlightResponse>
 };
 
 // 하이라이트 생성 (영상 업로드)
-export const createHighlight = async (matchId: string, video: File): Promise<HighlightResponse> => {
+export const createHighlight = async (matchId: string, video: File, gameStartOffset: number = 0): Promise<HighlightResponse> => {
     const formData = new FormData();
     formData.append('video', video);
     const requestBlob = new Blob(
-        [JSON.stringify({ matchId, title: `${matchId} 하이라이트` })],
+        [JSON.stringify({ matchId, title: `${matchId} 하이라이트`, gameStartOffset })],
         { type: 'application/json' }
     );
     formData.append('request', requestBlob);

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, desktopCapturer } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, desktopCapturer, systemPreferences, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
@@ -182,8 +182,8 @@ async function checkGamePhase() {
             startLiveGamePolling();
 
         } else if (['WaitingForStats', 'EndOfGame', 'PreEndOfGame'].includes(phase)
-                && (gameState === 'LOADING' || gameState === 'IN_GAME')) {
-            // 게임 종료
+                && gameState === 'IN_GAME') {
+            // 게임 종료 (game-started가 발송된 경우에만)
             console.log('[Game Monitor] Game ended');
             stopLiveGamePolling();
             gameState = 'ENDED';
@@ -195,6 +195,14 @@ async function checkGamePhase() {
 
             // 30초 후 상태 초기화
             setTimeout(() => { gameState = 'NONE'; currentMatchId = null; }, 30000);
+
+        } else if (['WaitingForStats', 'EndOfGame', 'PreEndOfGame'].includes(phase)
+                && gameState === 'LOADING') {
+            // game-started 없이 게임 종료 — 상태만 정리, 이벤트 미발송
+            console.log('[Game Monitor] Game ended before live detection, skipping game-ended event');
+            stopLiveGamePolling();
+            gameState = 'NONE';
+            currentMatchId = null;
 
         } else if (['None', 'Lobby'].includes(phase) && gameState !== 'NONE') {
             stopLiveGamePolling();
@@ -231,13 +239,13 @@ function startLiveGamePolling() {
             stopLiveGamePolling();
             return;
         }
-        const matchId = await lcuConnector.getLiveMatchId();
-        if (matchId) {
-            console.log('[Game Monitor] Game is now LIVE — matchId:', matchId);
-            currentMatchId = matchId;
+        const result = await lcuConnector.getLiveMatchId();
+        if (result) {
+            console.log('[Game Monitor] Game is now LIVE — matchId:', result.matchId, 'gameTime:', result.gameTime);
+            currentMatchId = result.matchId;
             gameState = 'IN_GAME';
             stopLiveGamePolling();
-            mainWindow?.webContents.send('game-started', { matchId });
+            mainWindow?.webContents.send('game-started', { matchId: result.matchId, gameStartOffset: result.gameTime });
         }
     }, 2000);
 }
@@ -249,12 +257,47 @@ function stopLiveGamePolling() {
     }
 }
 
+// ─── 화면 녹화 권한 체크 ─────────────────────────────────────
+
+async function checkScreenRecordingPermission() {
+    if (process.platform !== 'darwin') return true;
+
+    const status = systemPreferences.getMediaAccessStatus('screen');
+    console.log('[Permission] Screen recording status:', status);
+
+    if (status === 'granted') return true;
+
+    // 권한 트리거: getSources 호출하면 macOS가 권한 등록 시도
+    try {
+        await desktopCapturer.getSources({ types: ['screen'] });
+    } catch {}
+
+    const newStatus = systemPreferences.getMediaAccessStatus('screen');
+    if (newStatus === 'granted') return true;
+
+    const { response } = await dialog.showMessageBox({
+        type: 'warning',
+        title: '화면 녹화 권한 필요',
+        message: 'LOL Highlight가 게임을 녹화하려면 화면 녹화 권한이 필요합니다.',
+        detail: '시스템 설정 → 개인정보 보호 및 보안 → 화면 기록에서 이 앱을 허용해주세요.\n권한 설정 후 앱을 재시작하세요.',
+        buttons: ['시스템 설정 열기', '나중에'],
+        defaultId: 0,
+    });
+
+    if (response === 0) {
+        shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+    }
+
+    return false;
+}
+
 // ─── 앱 초기화 ────────────────────────────────────────────────
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
     setupIpcHandlers();
     createWindow();
     createTray();
+    await checkScreenRecordingPermission();
     startLeagueMonitoring();
 
     app.on('activate', () => {
@@ -272,8 +315,22 @@ function setupIpcHandlers() {
     });
 
     ipcMain.handle('get-screen-sources', async () => {
-        const sources = await desktopCapturer.getSources({ types: ['screen'] });
+        const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
         return sources.map(s => ({ id: s.id, name: s.name }));
+    });
+
+    ipcMain.on('set-recording-state', (event, isRecording) => {
+        if (!tray) return;
+        tray.setToolTip(isRecording ? '🔴 LOL Highlight — 녹화 중' : 'LOL Highlight');
+    });
+
+    ipcMain.handle('check-screen-permission', async () => {
+        if (process.platform !== 'darwin') return 'granted';
+        return systemPreferences.getMediaAccessStatus('screen');
+    });
+
+    ipcMain.handle('open-screen-permission', () => {
+        shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
     });
 
     ipcMain.handle('save-video', (event, { buffer, filename }) => {

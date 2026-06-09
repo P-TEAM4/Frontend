@@ -52,11 +52,10 @@ class LCUConnector {
         if (process.platform === 'win32') {
             return 'C:\\Riot Games\\League of Legends\\lockfile';
         } else if (process.platform === 'darwin') {
-            // macOS
-            return path.join(
-                process.env.HOME,
-                'Applications/League of Legends.app/Contents/LoL/lockfile'
-            );
+            // macOS: /Applications 우선, 없으면 ~/Applications
+            const systemPath = '/Applications/League of Legends.app/Contents/LoL/lockfile';
+            const userPath = path.join(process.env.HOME, 'Applications/League of Legends.app/Contents/LoL/lockfile');
+            return fs.existsSync(systemPath) ? systemPath : userPath;
         }
         throw new Error('Unsupported platform');
     }
@@ -267,7 +266,22 @@ class LCUConnector {
                         const json = JSON.parse(data);
                         if (json.gameId) {
                             const region = await this.getRegion();
-                            resolve(`${region}_${json.gameId}`);
+                            resolve({
+                                matchId: `${region}_${json.gameId}`,
+                                gameTime: typeof json.gameTime === 'number' ? json.gameTime : 0,
+                            });
+                        } else if (res.statusCode === 200) {
+                            // gameId 없는 게임 모드(신속대전 등) — LCU gameflow session에서 fallback
+                            try {
+                                const region = await this.getRegion();
+                                const session = await this.request('/lol-gameflow/v1/session');
+                                const gameId = session?.gameData?.gameId;
+                                resolve(gameId
+                                    ? { matchId: `${region}_${gameId}`, gameTime: 0 }
+                                    : { matchId: `${region}_LIVE_${Date.now()}`, gameTime: 0 });
+                            } catch {
+                                resolve(null);
+                            }
                         } else {
                             resolve(null);
                         }

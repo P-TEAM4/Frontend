@@ -16,6 +16,7 @@
     "@react-oauth/google": "^0.12.2",
     "@tanstack/react-query": "^5.90.12",
     "axios": "^1.13.2",
+    "fix-webm-duration": "^1.0.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.10.1",

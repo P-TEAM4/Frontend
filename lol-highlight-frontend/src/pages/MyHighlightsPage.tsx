@@ -19,7 +19,7 @@ function parseEventData(raw: string | null): ClipEventData | null {
     try { return JSON.parse(raw) as ClipEventData; } catch { return null; }
 }
 
-const AI_BASE_URL = 'http://localhost:8000';
+const AI_BASE_URL = 'http://localhost:8001';
 
 function resolveVideoUrl(url: string | null): string | null {
     if (!url) return null;
@@ -58,7 +58,7 @@ const ClipModal: React.FC<{ clip: HighlightResponse; onClose: () => void }> = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={onClose}>
-            <div className="relative w-full max-w-2xl mx-4 bg-[#0D1B2A] rounded-xl border border-[#1E3A5F] shadow-[0_0_50px_rgba(0,200,255,0.2)]" onClick={(e) => e.stopPropagation()}>
+            <div className="relative w-full max-w-2xl mx-4 bg-[#0D1B2A] rounded-xl border border-[#1E3A5F] shadow-[0_0_50px_rgba(0,200,255,0.2)] max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
 
                 {/* 헤더 */}
                 <div className="flex items-center justify-between p-4 border-b border-[#1E3A5F]">
@@ -91,7 +91,7 @@ const ClipModal: React.FC<{ clip: HighlightResponse; onClose: () => void }> = ({
                 </div>
 
                 {/* 상세 정보 */}
-                <div className="p-4 border-t border-[#1E3A5F] space-y-3">
+                <div className="p-4 border-t border-[#1E3A5F] space-y-3 overflow-y-auto flex-1">
                     {/* 승률 영향 */}
                     {clip.description && (
                         <p className={`text-sm font-medium ${isMistake ? 'text-[#E84057]' : 'text-[#6BCF7F]'}`}>
