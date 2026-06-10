@@ -570,7 +570,7 @@ const MyHighlightsPage: React.FC = () => {
             }
             acc[h.matchId].highlights.push(h);
             if (h.title.startsWith('[실수]')) acc[h.matchId].mistakeCount++;
-            else acc[h.matchId].highlightCount++;
+            else if (h.title.startsWith('[하이라이트]')) acc[h.matchId].highlightCount++;
             return acc;
         }, {} as Record<string, MatchGroup>)
     ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
