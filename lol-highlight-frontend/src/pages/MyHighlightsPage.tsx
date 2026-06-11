@@ -14,6 +14,15 @@ function parseAiModelData(raw: string | null): AiModelData | null {
     try { return JSON.parse(raw) as AiModelData; } catch { return null; }
 }
 
+function parseMd(text: string): React.ReactNode[] {
+    return text.split(/(\*\*[^*]+\*\*)/).map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={i} className="text-[#F0F0F0] font-semibold">{part.slice(2, -2)}</strong>;
+        }
+        return part;
+    });
+}
+
 function parseEventData(raw: string | null): ClipEventData | null {
     if (!raw) return null;
     try { return JSON.parse(raw) as ClipEventData; } catch { return null; }
@@ -101,9 +110,22 @@ const ClipModal: React.FC<{ clip: HighlightResponse; onClose: () => void }> = ({
 
                     {/* AI 코칭 */}
                     {clip.coaching && (
-                        <div className="bg-[#112240] rounded-lg px-4 py-3 border-l-2 border-[#C8AA6E]">
-                            <p className="text-xs text-[#C8AA6E] font-semibold mb-1">AI 코칭</p>
-                            <p className="text-sm text-[#A0A0A0] leading-relaxed">{clip.coaching}</p>
+                        <div className="bg-[#112240] rounded-lg px-4 py-3 border-l-2 border-[#C8AA6E] space-y-2">
+                            <p className="text-xs text-[#C8AA6E] font-semibold">AI 코칭</p>
+                            {clip.coaching.split(/(?=\*\*[^*]+:\*\*)/).map((section, i) => {
+                                const match = section.match(/^\*\*([^*]+):\*\*\s*([\s\S]*)/);
+                                if (match) {
+                                    return (
+                                        <div key={i}>
+                                            <span className="text-xs font-bold text-[#C8AA6E]">{match[1]}</span>
+                                            <p className="text-sm text-[#A0A0A0] leading-relaxed mt-0.5">{match[2].trim()}</p>
+                                        </div>
+                                    );
+                                }
+                                return section.trim() ? (
+                                    <p key={i} className="text-sm text-[#A0A0A0] leading-relaxed">{section.trim()}</p>
+                                ) : null;
+                            })}
                         </div>
                     )}
 
@@ -147,18 +169,17 @@ const ClipModal: React.FC<{ clip: HighlightResponse; onClose: () => void }> = ({
     );
 };
 
-// ── ScoreBar ─────────────────────────────────────────────────────────────────
-const ScoreBar: React.FC<{ label: string; value: number | null }> = ({ label, value }) => {
+// ── ScoreCard ─────────────────────────────────────────────────────────────────
+const ScoreCard: React.FC<{ label: string; value: number | null }> = ({ label, value }) => {
     const pct = value != null ? Math.round(Math.min(Math.max(value, 0), 100)) : 0;
     const color = pct >= 70 ? '#6BCF7F' : pct >= 40 ? '#FFD93D' : '#E84057';
+    const bg = pct >= 70 ? 'rgba(107,207,127,0.08)' : pct >= 40 ? 'rgba(255,217,61,0.08)' : 'rgba(232,64,87,0.08)';
     return (
-        <div>
-            <div className="flex justify-between text-xs mb-1">
-                <span className="text-[#8B8B8B]">{label}</span>
-                <span style={{ color }} className="font-semibold">{value != null ? value.toFixed(1) : '-'}</span>
-            </div>
-            <div className="h-1.5 bg-[#1E3A5F] rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: color }} />
+        <div className="flex flex-col items-center justify-center rounded-lg p-3 border border-[#1E3A5F]" style={{ background: bg }}>
+            <span className="text-xs text-[#8B8B8B] mb-1 text-center leading-tight">{label}</span>
+            <span className="text-xl font-bold" style={{ color }}>{value != null ? Math.round(value) : '-'}</span>
+            <div className="w-full h-1 bg-[#1E3A5F] rounded-full mt-2 overflow-hidden">
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
             </div>
         </div>
     );
@@ -307,7 +328,14 @@ const WinProbaBar: React.FC<{ baseline: number; predicted: number }> = ({ baseli
 };
 
 // ── 경기 분석 섹션 ────────────────────────────────────────────────────────────
+const PHASE_CONFIG = [
+    { key: 'coachingEarlyGame',  label: '라인전',   color: '#00C8FF', icon: '⚔' },
+    { key: 'coachingMidGame',    label: '중반전',   color: '#C8AA6E', icon: '🏰' },
+    { key: 'coachingLateGame',   label: '후반전',   color: '#6BCF7F', icon: '⚡' },
+] as const;
+
 const MatchAnalysisSection: React.FC<{ matchId: string }> = ({ matchId }) => {
+    const [activePhase, setActivePhase] = useState<string>('coachingEarlyGame');
     const { data: analysis, isLoading } = useQuery<AnalysisResponse>({
         queryKey: ['matchAnalysis', matchId],
         queryFn: () => getMatchAnalysis(matchId),
@@ -317,27 +345,37 @@ const MatchAnalysisSection: React.FC<{ matchId: string }> = ({ matchId }) => {
 
     if (isLoading) {
         return (
-            <div className="bg-[#0D1B2A] rounded-xl border border-[#1E3A5F] p-6 mb-6 animate-pulse">
-                <div className="h-4 bg-[#1E3A5F] rounded w-32 mb-4" />
-                <div className="grid grid-cols-2 gap-3">
-                    {[...Array(6)].map((_, i) => <div key={i} className="h-8 bg-[#1E3A5F] rounded" />)}
+            <div className="bg-[#0D1B2A] rounded-xl border border-[#1E3A5F] p-6 mb-6 space-y-4 animate-pulse">
+                <div className="flex justify-between">
+                    <div className="h-5 bg-[#1E3A5F] rounded w-24" />
+                    <div className="h-5 bg-[#1E3A5F] rounded w-32" />
                 </div>
+                <div className="h-14 bg-[#1E3A5F] rounded" />
+                <div className="grid grid-cols-3 gap-3">
+                    {[...Array(6)].map((_, i) => <div key={i} className="h-20 bg-[#1E3A5F] rounded-lg" />)}
+                </div>
+                <div className="h-24 bg-[#1E3A5F] rounded" />
             </div>
         );
     }
 
     if (!analysis || analysis.status !== 'COMPLETED') return null;
 
-    const { scores, strengthAnalysis, weaknessAnalysis, improvementSuggestions } = analysis;
+    const { scores, improvementSuggestions } = analysis;
     const ai = parseAiModelData(analysis.aiModelData);
-
-    const strengths = strengthAnalysis ? strengthAnalysis.split(' | ').filter(Boolean) : [];
-    const weaknesses = weaknessAnalysis ? weaknessAnalysis.split(' | ').filter(Boolean) : [];
     const improvements = improvementSuggestions ? improvementSuggestions.split(' | ').filter(Boolean) : [];
+    const hasGemini = !!(ai?.coachingSummary || ai?.coachingEarlyGame);
+    const activePhaseConfig = PHASE_CONFIG.find(p => p.key === activePhase);
+    const activeText = ai?.[activePhase as keyof typeof ai] as string | undefined;
+
+    // 핵심패턴 good/bad 분리 (— 구분자 기준)
+    const keyPattern = ai?.coachingKeyPattern ?? '';
+    const [kpGood, kpBad] = keyPattern.includes('—') ? keyPattern.split('—').map(s => s.trim()) : [keyPattern, ''];
 
     return (
-        <div className="bg-[#0D1B2A] rounded-xl border border-[#1E3A5F] p-6 mb-6 space-y-5">
-            {/* 헤더: 챔피언 + 역할 + 승패 */}
+        <div className="bg-[#0D1B2A] rounded-xl border border-[#1E3A5F] p-5 mb-6 space-y-4">
+
+            {/* ── 헤더 ── */}
             <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-[#C8AA6E] flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -346,107 +384,147 @@ const MatchAnalysisSection: React.FC<{ matchId: string }> = ({ matchId }) => {
                     경기 분석
                 </h3>
                 {ai && (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         {ai.champion && (
                             <div className="flex items-center gap-2">
                                 <img
                                     src={`https://ddragon.leagueoflegends.com/cdn/15.10.1/img/champion/${ai.champion}.png`}
                                     alt={ai.champion}
-                                    className="w-8 h-8 rounded-full border border-[#1E3A5F]"
+                                    className="w-7 h-7 rounded-full border border-[#1E3A5F]"
                                     onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                                 />
                                 <div>
-                                    <p className="text-sm font-semibold text-[#F0F0F0]">{ai.champion}</p>
-                                    {ai.role && <p className="text-xs text-[#8B8B8B]">{ROLE_KO[ai.role.toUpperCase()] ?? ai.role}</p>}
+                                    <p className="text-xs font-semibold text-[#F0F0F0] leading-none">{ai.champion}</p>
+                                    {ai.role && <p className="text-[10px] text-[#8B8B8B] mt-0.5">{ROLE_KO[ai.role.toUpperCase()] ?? ai.role}</p>}
                                 </div>
                             </div>
                         )}
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${ai.win ? 'bg-[#28A0F0]/20 text-[#28A0F0]' : 'bg-[#E84057]/20 text-[#E84057]'}`}>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${ai.win ? 'bg-[#28A0F0]/20 text-[#28A0F0]' : 'bg-[#E84057]/20 text-[#E84057]'}`}>
                             {ai.win ? '승리' : '패배'}
                         </span>
                     </div>
                 )}
             </div>
 
-            {/* AI 요약 */}
-            {ai?.summary && (
-                <p className="text-sm text-[#A0A0A0] bg-[#112240] rounded-lg px-4 py-3 border-l-2 border-[#C8AA6E]">
-                    {ai.summary}
-                </p>
+            {/* ── 총평 ── */}
+            {(ai?.coachingSummary || ai?.summary) && (
+                <div className="bg-[#112240] rounded-lg px-4 py-3 border-l-2 border-[#C8AA6E]">
+                    <p className="text-xs text-[#A0A0A0] leading-relaxed">
+                        {parseMd(ai.coachingSummary || ai.summary)}
+                    </p>
+                </div>
             )}
 
-            {/* 승리 기여도 */}
+            {/* ── 승리 기여도 ── */}
             {ai && ai.baselineProba > 0 && ai.predictedProba > 0 && (
                 <WinProbaBar baseline={ai.baselineProba} predicted={ai.predictedProba} />
             )}
 
-            {/* 점수 바 */}
+            {/* ── 점수 카드 그리드 ── */}
             {scores && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3">
-                    <ScoreBar label="영향력 (ML)" value={scores.impactScore} />
-                    <ScoreBar label="딜 기여도" value={scores.teamFightScore} />
-                    <ScoreBar label="파밍" value={scores.farmingScore} />
-                    <ScoreBar label="시야" value={scores.visionScore} />
-                    <ScoreBar label="골드 효율" value={scores.objectiveControlScore} />
-                    <ScoreBar label="종합" value={scores.averageScore} />
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+                    <ScoreCard label="영향력" value={scores.impactScore} />
+                    <ScoreCard label="딜 기여" value={scores.teamFightScore} />
+                    <ScoreCard label="파밍" value={scores.farmingScore} />
+                    <ScoreCard label="시야" value={scores.visionScore} />
+                    <ScoreCard label="골드" value={scores.objectiveControlScore} />
+                    <ScoreCard label="종합" value={scores.averageScore} />
                 </div>
             )}
 
-            {/* 강점 / 약점 / 개선점 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                {strengths.length > 0 && (
-                    <div className="bg-[#112240] rounded-lg p-3 border border-[#6BCF7F]/30">
-                        <div className="text-[#6BCF7F] font-semibold mb-2">강점</div>
-                        <ul className="space-y-1">
-                            {strengths.map((s, i) => (
-                                <li key={i} className="text-[#A0A0A0] flex items-start gap-1">
-                                    <span className="text-[#6BCF7F] mt-0.5">•</span>{s}
-                                </li>
-                            ))}
-                        </ul>
+            {/* ── 단계별 분석 (탭) ── */}
+            {hasGemini && (
+                <div>
+                    {/* 탭 버튼 */}
+                    <div className="flex gap-1 mb-2">
+                        {PHASE_CONFIG.map(({ key, label, color }) => {
+                            const hasContent = !!(ai?.[key as keyof typeof ai]);
+                            if (!hasContent) return null;
+                            const isActive = activePhase === key;
+                            return (
+                                <button
+                                    key={key}
+                                    onClick={() => setActivePhase(key)}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                        isActive
+                                            ? 'text-[#0D1B2A]'
+                                            : 'text-[#8B8B8B] bg-[#112240] hover:text-[#F0F0F0]'
+                                    }`}
+                                    style={isActive ? { backgroundColor: color } : {}}
+                                >
+                                    {label}
+                                </button>
+                            );
+                        })}
                     </div>
-                )}
-                {weaknesses.length > 0 && (
-                    <div className="bg-[#112240] rounded-lg p-3 border border-[#E84057]/30">
-                        <div className="text-[#E84057] font-semibold mb-2">약점</div>
-                        <ul className="space-y-1">
-                            {weaknesses.map((w, i) => (
-                                <li key={i} className="text-[#A0A0A0] flex items-start gap-1">
-                                    <span className="text-[#E84057] mt-0.5">•</span>{w}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-                {improvements.length > 0 && (
-                    <div className="bg-[#112240] rounded-lg p-3 border border-[#C8AA6E]/30">
-                        <div className="text-[#C8AA6E] font-semibold mb-2">개선점</div>
-                        <ul className="space-y-1">
-                            {improvements.map((imp, i) => (
-                                <li key={i} className="text-[#A0A0A0] flex items-start gap-1">
-                                    <span className="text-[#C8AA6E] mt-0.5">•</span>{imp}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-            </div>
+                    {/* 탭 컨텐츠 */}
+                    {activeText && (
+                        <div
+                            className="bg-[#112240] rounded-lg p-4 border-t-2 text-xs text-[#B0B0B0] leading-relaxed"
+                            style={{ borderColor: activePhaseConfig?.color ?? '#1E3A5F' }}
+                        >
+                            {parseMd(activeText)}
+                        </div>
+                    )}
+                </div>
+            )}
 
-            {/* 주요 기여 지표 (Top Features) */}
+            {/* ── 핵심패턴 ── */}
+            {keyPattern && (
+                <div className="grid grid-cols-2 gap-2">
+                    {kpGood && (
+                        <div className="bg-[#112240] rounded-lg p-3 border border-[#6BCF7F]/30">
+                            <div className="text-[10px] font-bold text-[#6BCF7F] mb-1.5 flex items-center gap-1">
+                                <span>✓</span> 잘한 습관
+                            </div>
+                            <p className="text-xs text-[#A0A0A0] leading-relaxed">{parseMd(kpGood)}</p>
+                        </div>
+                    )}
+                    {kpBad && (
+                        <div className="bg-[#112240] rounded-lg p-3 border border-[#E84057]/30">
+                            <div className="text-[10px] font-bold text-[#E84057] mb-1.5 flex items-center gap-1">
+                                <span>✗</span> 고칠 습관
+                            </div>
+                            <p className="text-xs text-[#A0A0A0] leading-relaxed">{parseMd(kpBad)}</p>
+                        </div>
+                    )}
+                    {!kpBad && kpGood && (
+                        <div className="bg-[#112240] rounded-lg p-3 border border-[#A78BFA]/30 col-span-2">
+                            <div className="text-[10px] font-bold text-[#A78BFA] mb-1.5">⚡ 핵심 패턴</div>
+                            <p className="text-xs text-[#A0A0A0] leading-relaxed">{parseMd(kpGood)}</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ── 개선점 ── */}
+            {improvements.length > 0 && (
+                <div className="space-y-2">
+                    <p className="text-xs font-bold text-[#C8AA6E]">개선점</p>
+                    {improvements.map((imp, i) => (
+                        <div key={i} className="flex gap-3 bg-[#112240] rounded-lg px-3 py-2.5 border border-[#C8AA6E]/20">
+                            <span className="text-[#C8AA6E] font-bold text-xs shrink-0 w-4">{i + 1}.</span>
+                            <p className="text-xs text-[#A0A0A0] leading-relaxed">{parseMd(imp)}</p>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* ── 주요 영향 지표 ── */}
             {ai?.topFeatures && ai.topFeatures.length > 0 && (
                 <div>
                     <p className="text-xs text-[#8B8B8B] font-semibold mb-2">주요 영향 지표</p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1.5">
                         {ai.topFeatures.slice(0, 5).map((f, i) => (
                             <span
                                 key={i}
-                                className={`text-xs px-2 py-1 rounded-full border ${
-                                    f.direction === 'positive'
+                                className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
+                                    f.direction === 'up'
                                         ? 'border-[#6BCF7F]/40 text-[#6BCF7F] bg-[#6BCF7F]/10'
                                         : 'border-[#E84057]/40 text-[#E84057] bg-[#E84057]/10'
                                 }`}
                             >
-                                {f.direction === 'positive' ? '▲' : '▼'} {f.displayName}
+                                {f.direction === 'up' ? '▲' : '▼'} {f.displayName}
                             </span>
                         ))}
                     </div>

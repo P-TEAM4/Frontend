@@ -152,6 +152,12 @@ export interface AiModelData {
         shap: number;
         value: number;
     }>;
+    // Gemini 경기분석 단계별 코칭
+    coachingSummary?: string;
+    coachingEarlyGame?: string;
+    coachingMidGame?: string;
+    coachingLateGame?: string;
+    coachingKeyPattern?: string;
 }
 
 export interface AnalysisResponse {

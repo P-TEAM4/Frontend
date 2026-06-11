@@ -204,6 +204,15 @@ async function checkGamePhase() {
             gameState = 'NONE';
             currentMatchId = null;
 
+        } else if (['None', 'Lobby'].includes(phase) && gameState === 'IN_GAME') {
+            // 연습 모드 등 EndOfGame 없이 바로 종료되는 케이스
+            console.log('[Game Monitor] Game ended (direct to None/Lobby — practice mode?)');
+            stopLiveGamePolling();
+            gameState = 'ENDED';
+            const matchId = currentMatchId || null;
+            mainWindow?.webContents.send('game-ended', { matchId });
+            setTimeout(() => { gameState = 'NONE'; currentMatchId = null; }, 30000);
+
         } else if (['None', 'Lobby'].includes(phase) && gameState !== 'NONE') {
             stopLiveGamePolling();
             gameState = 'NONE';
@@ -269,7 +278,10 @@ async function checkScreenRecordingPermission() {
 
     // 권한 트리거: getSources 호출하면 macOS가 권한 등록 시도
     try {
-        await desktopCapturer.getSources({ types: ['screen'] });
+        await desktopCapturer.getSources({
+            types: ['screen'],
+            ...(process.platform === 'darwin' ? { useSystemScreenCaptureAPI: true } : {}),
+        });
     } catch {}
 
     const newStatus = systemPreferences.getMediaAccessStatus('screen');
@@ -315,8 +327,46 @@ function setupIpcHandlers() {
     });
 
     ipcMain.handle('get-screen-sources', async () => {
-        const sources = await desktopCapturer.getSources({ types: ['window', 'screen'] });
-        return sources.map(s => ({ id: s.id, name: s.name }));
+        const { screen } = require('electron');
+        // useSystemScreenCaptureAPI: macOS ScreenCaptureKit 사용 → GPU/Metal 앱 캡처 가능
+        const sources = await desktopCapturer.getSources({
+            types: ['window', 'screen'],
+            ...(process.platform === 'darwin' ? { useSystemScreenCaptureAPI: true } : {}),
+        });
+        const cursorPoint = screen.getCursorScreenPoint();
+        const activeDisplay = screen.getDisplayNearestPoint(cursorPoint);
+        const allDisplays = screen.getAllDisplays();
+        const activeDisplayIndex = allDisplays.findIndex(d => d.id === activeDisplay.id);
+        return {
+            sources: sources.map(s => ({ id: s.id, name: s.name })),
+            activeDisplayIndex,
+            displayCount: allDisplays.length,
+        };
+    });
+
+    // 글로벌 단축키: Cmd+Shift+R → 녹화 강제 종료 (연습 모드/디버그용)
+    const { globalShortcut } = require('electron');
+    globalShortcut.register('CommandOrControl+Shift+R', () => {
+        console.log('[Game Monitor] Force stop shortcut triggered, gameState:', gameState);
+        if (!['IN_GAME', 'LOADING'].includes(gameState)) {
+            console.log('[Game Monitor] Not in game, ignoring shortcut');
+            return;
+        }
+        stopLiveGamePolling();
+        const matchId = currentMatchId || null;
+        gameState = 'NONE';
+        currentMatchId = null;
+        mainWindow?.webContents.send('game-ended', { matchId });
+    });
+
+    ipcMain.handle('force-game-ended', async () => {
+        console.log('[Game Monitor] Force game-ended triggered, gameState:', gameState);
+        if (!['IN_GAME', 'LOADING'].includes(gameState)) return;
+        stopLiveGamePolling();
+        gameState = 'NONE';
+        const matchId = currentMatchId || null;
+        currentMatchId = null;
+        mainWindow?.webContents.send('game-ended', { matchId });
     });
 
     ipcMain.on('set-recording-state', (event, isRecording) => {

@@ -23,13 +23,34 @@ export function useGameRecorder() {
             }
             try {
                 console.log('[Recorder] Game started — beginning screen capture');
-                const sources: { id: string; name: string }[] = await ipcRenderer.invoke('get-screen-sources');
-                console.log('[Recorder] Available sources:', sources.map((s) => s.name));
-                const LOL_NAMES = ['league of legends', 'league_client', '리그 오브 레전드'];
+                const result: { sources: { id: string; name: string }[]; activeDisplayIndex: number; displayCount: number } =
+                    await ipcRenderer.invoke('get-screen-sources');
+                const sources = result.sources;
+                const { activeDisplayIndex, displayCount } = result;
+                console.log('[Recorder] Available sources:', sources.map((s) => `${s.id}:${s.name}`));
+                console.log('[Recorder] Active display index:', activeDisplayIndex, '/ total:', displayCount);
+
+                const LOL_NAMES = [
+                    'league of legends', 'league_client', '리그 오브 레전드',
+                    'leagueoflegends', 'riot client', 'riotclient',
+                ];
+                // window 소스에서 먼저 LoL 찾기
+                const lolWindow = sources.find(
+                    (s) => s.id.startsWith('window:') && LOL_NAMES.some((n) => s.name.toLowerCase().includes(n))
+                );
+                // 풀스크린 모드 시 macOS는 별도 screen으로 잡힘 — screen 소스에서도 탐색
+                const lolScreen = sources.find(
+                    (s) => s.id.startsWith('screen:') && LOL_NAMES.some((n) => s.name.toLowerCase().includes(n))
+                );
+                const screens = sources.filter((s) => s.id.startsWith('screen:'));
+                // 커서 위치 기반으로 활성 디스플레이 선택 (game-started 시점엔 LoL이 포커스)
+                const activeScreen = screens[activeDisplayIndex] ?? screens[0];
+                // 창모드: lolWindow 우선 (LoL만 캡처)
+                // 전체화면(exclusive): lolWindow가 검은화면 → screen source로 fallback
                 const source =
-                    sources.find((s) => LOL_NAMES.some((n) => s.name.toLowerCase().includes(n))) ??
-                    sources.find((s) => s.name.toLowerCase().includes('screen')) ??
-                    sources.find((s) => s.id.startsWith('screen:')) ??
+                    lolWindow ??
+                    lolScreen ??
+                    (screens.length === 1 ? screens[0] : activeScreen) ??
                     sources[0];
                 if (!source) {
                     console.error('[Recorder] No screen source found — sources list was empty');
@@ -100,14 +121,24 @@ export function useGameRecorder() {
         };
 
         const gameStartOffsetRef = { current: 0 };
+        let handlingGameEnd = false;
 
         const handleGameStarted = (_: any, { matchId, gameStartOffset }: { matchId: string | null; gameStartOffset?: number }) => {
+            if (mediaRecorderRef.current?.state === 'recording') {
+                console.warn('[Recorder] game-started ignored — already recording');
+                return;
+            }
             console.log('[Recorder] Game started, matchId:', matchId, 'gameStartOffset:', gameStartOffset);
             gameStartOffsetRef.current = gameStartOffset ?? 0;
             startRecording();
         };
 
         const handleGameEnded = async (_: any, { matchId }: { matchId: string | null }) => {
+            if (handlingGameEnd) {
+                console.warn('[Recorder] game-ended already in progress, ignoring duplicate');
+                return;
+            }
+            handlingGameEnd = true;
             console.log('[Recorder] Game ended, matchId:', matchId);
             const videoFile = await stopRecording();
 
@@ -138,12 +169,15 @@ export function useGameRecorder() {
             }
         };
 
+        // 중복 리스너 방지 (React StrictMode / HMR 재마운트 대응)
+        ipcRenderer.removeAllListeners('game-started');
+        ipcRenderer.removeAllListeners('game-ended');
         ipcRenderer.on('game-started', handleGameStarted);
         ipcRenderer.on('game-ended', handleGameEnded);
 
         return () => {
-            ipcRenderer.removeListener('game-started', handleGameStarted);
-            ipcRenderer.removeListener('game-ended', handleGameEnded);
+            ipcRenderer.removeAllListeners('game-started');
+            ipcRenderer.removeAllListeners('game-ended');
             // 언마운트 시 녹화 중이면 중지
             if (mediaRecorderRef.current?.state !== 'inactive') {
                 mediaRecorderRef.current?.stop();
