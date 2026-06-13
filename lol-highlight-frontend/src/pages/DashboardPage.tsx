@@ -12,6 +12,19 @@ import Button from '../components/common/Button';
 import { formatRelativeTime, getProfileIconUrl, getRankEmblemUrl, type HighlightResponse } from '../types/api';
 
 const AI_BASE_URL = 'http://localhost:8001';
+
+function parseCoachingSections(text: string): { header: string; body: string }[] {
+    const stripped = text.replace(/\*\*([^*]+)\*\*/g, '$1');
+    const HEADERS = ['결정적 판단', '판단 분석', '대안 플레이', '연습 포인트', '잘한 점', '발전 포인트', '킬 평가', '데스 원인', '교환 평가'];
+    const pattern = new RegExp(`(?=(?:${HEADERS.join('|')})\\s*:)`, 'g');
+    const parts = stripped.split(pattern).filter(s => s.trim());
+    if (parts.length <= 1) return [{ header: '', body: stripped.trim() }];
+    return parts.map(part => {
+        const m = part.match(/^([^:]+):\s*([\s\S]*)/);
+        return m ? { header: m[1].trim(), body: m[2].trim() } : { header: '', body: part.trim() };
+    });
+}
+
 function resolveVideoUrl(url: string | null): string | null {
     if (!url) return null;
     if (url.startsWith('http')) return url;
@@ -436,9 +449,14 @@ const DashboardPage: React.FC = () => {
                                 {activeClip.title.replace(/^\[(하이라이트|실수)\]\s*/, '')}
                             </h3>
                             {activeClip.coaching && (
-                                <div className="bg-[#1C1C1F] rounded-lg p-3 border-l-2 border-[#00C8FF]">
-                                    <p className="text-xs text-[#8B8B8B] mb-1">AI 코칭</p>
-                                    <p className="text-sm text-[#E0E0E0] leading-relaxed">{activeClip.coaching}</p>
+                                <div className="bg-[#1C1C1F] rounded-lg p-3 border-l-2 border-[#00C8FF] space-y-2">
+                                    <p className="text-xs text-[#8B8B8B]">AI 코칭</p>
+                                    {parseCoachingSections(activeClip.coaching).map(({ header, body }, i) => (
+                                        <div key={i}>
+                                            {header && <span className="text-xs font-bold text-[#00C8FF]">{header}</span>}
+                                            <p className="text-sm text-[#E0E0E0] leading-relaxed mt-0.5">{body}</p>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                             {activeClip.description && (

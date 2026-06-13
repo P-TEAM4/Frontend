@@ -28,6 +28,19 @@ function parseEventData(raw: string | null): ClipEventData | null {
     try { return JSON.parse(raw) as ClipEventData; } catch { return null; }
 }
 
+// Gemini 응답을 섹션별로 파싱 — **헤더:** 형식과 plain 헤더: 형식 모두 처리
+function parseCoachingSections(text: string): { header: string; body: string }[] {
+    const stripped = text.replace(/\*\*([^*]+)\*\*/g, '$1');
+    const HEADERS = ['결정적 판단', '판단 분석', '대안 플레이', '연습 포인트', '잘한 점', '발전 포인트', '킬 평가', '데스 원인', '교환 평가'];
+    const pattern = new RegExp(`(?=(?:${HEADERS.join('|')})\\s*:)`, 'g');
+    const parts = stripped.split(pattern).filter(s => s.trim());
+    if (parts.length <= 1) return [{ header: '', body: stripped.trim() }];
+    return parts.map(part => {
+        const m = part.match(/^([^:]+):\s*([\s\S]*)/);
+        return m ? { header: m[1].trim(), body: m[2].trim() } : { header: '', body: part.trim() };
+    });
+}
+
 const AI_BASE_URL = 'http://localhost:8001';
 
 function resolveVideoUrl(url: string | null): string | null {
@@ -112,20 +125,12 @@ const ClipModal: React.FC<{ clip: HighlightResponse; onClose: () => void }> = ({
                     {clip.coaching && (
                         <div className="bg-[#112240] rounded-lg px-4 py-3 border-l-2 border-[#C8AA6E] space-y-2">
                             <p className="text-xs text-[#C8AA6E] font-semibold">AI 코칭</p>
-                            {clip.coaching.split(/(?=\*\*[^*]+:\*\*)/).map((section, i) => {
-                                const match = section.match(/^\*\*([^*]+):\*\*\s*([\s\S]*)/);
-                                if (match) {
-                                    return (
-                                        <div key={i}>
-                                            <span className="text-xs font-bold text-[#C8AA6E]">{match[1]}</span>
-                                            <p className="text-sm text-[#A0A0A0] leading-relaxed mt-0.5">{match[2].trim()}</p>
-                                        </div>
-                                    );
-                                }
-                                return section.trim() ? (
-                                    <p key={i} className="text-sm text-[#A0A0A0] leading-relaxed">{section.trim()}</p>
-                                ) : null;
-                            })}
+                            {parseCoachingSections(clip.coaching).map(({ header, body }, i) => (
+                                <div key={i}>
+                                    {header && <span className="text-xs font-bold text-[#C8AA6E]">{header}</span>}
+                                    <p className="text-sm text-[#A0A0A0] leading-relaxed mt-0.5">{body}</p>
+                                </div>
+                            ))}
                         </div>
                     )}
 
